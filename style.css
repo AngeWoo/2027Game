@@ -241,11 +241,15 @@ body {
   filter: drop-shadow(0 0 0.14em var(--glow));
 }
 
+/* --name-size is set by fitTileNames(): as large as every tile allows */
 .tile .tile-name {
-  font-size: clamp(8.5px, 1.8cqw, 16px);
+  font-size: var(--name-size, clamp(8.5px, 1.8cqw, 16px));
   color: var(--text);
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.2;
   padding: 0 2px;
+  max-width: 100%;
+  word-break: keep-all; /* only break at the <wbr> hints (after 真如苑, before (, after 、) */
 }
 
 /* 機會 / 命運：大字 */
@@ -628,7 +632,6 @@ body {
   .subtitle { font-size: clamp(10px, 3.2vw, 13px); letter-spacing: 0; }
   .board { gap: 4px; padding: 4px; border-radius: 16px; }
   .tile { border-radius: 8px; gap: 4px; }
-  .tile .tile-name { word-break: keep-all; overflow-wrap: anywhere; }
 }
 
 @media (max-height: 420px) {

@@ -7,27 +7,28 @@ const GRID_POS = [
   [6, 5], [6, 4], [6, 3], [6, 2]
 ];
 
+// regular tiles are renamed to random 全球真如苑 locations at load (see dealTemples)
 const TILES = [
   { type: "start", name: "寒修行原點", quote: "每一個偉大的旅程，都從勇敢踏出第一步開始。" },
-  { type: "regular", name: "微笑角", quote: "慢慢來，比較快。" },
-  { type: "regular", name: "沉澱站", quote: "休息，是為了走更長遠的路。" },
+  { type: "regular", name: "精舍", quote: "慢慢來，比較快。" },
+  { type: "regular", name: "精舍", quote: "休息，是為了走更長遠的路。" },
   { type: "chance", name: "機會", quote: "機會，總是留給準備好的人。" },
-  { type: "regular", name: "勇氣小徑", quote: "你比想像中更勇敢。" },
-  { type: "regular", name: "幸運轉角", quote: "有些路只能一個人走，但你並不孤單。" },
-  { type: "regular", name: "初心亭", quote: "別忘了當初為什麼出發。" },
-  { type: "regular", name: "感恩驛站", quote: "感恩，讓平凡變得不凡。" },
+  { type: "regular", name: "精舍", quote: "你比想像中更勇敢。" },
+  { type: "regular", name: "精舍", quote: "有些路只能一個人走，但你並不孤單。" },
+  { type: "regular", name: "精舍", quote: "別忘了當初為什麼出發。" },
+  { type: "regular", name: "精舍", quote: "感恩，讓平凡變得不凡。" },
   { type: "fate", name: "命運", quote: "命運不是等待，而是選擇。" },
-  { type: "regular", name: "微光巷", quote: "黑暗之後，總會迎來微光。" },
-  { type: "regular", name: "度假小站", quote: "放慢腳步，享受此刻的風景。" },
-  { type: "regular", name: "堅持坡", quote: "山頂的風景，屬於堅持到底的人。" },
-  { type: "regular", name: "微笑驛站", quote: "微笑，是最好的名片。" },
+  { type: "regular", name: "精舍", quote: "黑暗之後，總會迎來微光。" },
+  { type: "regular", name: "精舍", quote: "放慢腳步，享受此刻的風景。" },
+  { type: "regular", name: "精舍", quote: "山頂的風景，屬於堅持到底的人。" },
+  { type: "regular", name: "精舍", quote: "微笑，是最好的名片。" },
   { type: "chance", name: "機會", quote: "勇敢踏出第一步，機會就在下一秒。" },
-  { type: "regular", name: "初衷之泉", quote: "你的努力，時間都看得見。" },
-  { type: "regular", name: "深呼吸角落", quote: "先別急著否定自己，深呼吸，再出發。" },
-  { type: "regular", name: "放手橋", quote: "學會放手，才能擁抱新的開始。" },
-  { type: "regular", name: "重生港", quote: "每一次跌倒，都是重新站起的練習。" },
+  { type: "regular", name: "精舍", quote: "你的努力，時間都看得見。" },
+  { type: "regular", name: "精舍", quote: "先別急著否定自己，深呼吸，再出發。" },
+  { type: "regular", name: "精舍", quote: "學會放手，才能擁抱新的開始。" },
+  { type: "regular", name: "精舍", quote: "每一次跌倒，都是重新站起的練習。" },
   { type: "fate", name: "命運", quote: "風雨過後，總會遇見屬於你的彩虹。" },
-  { type: "regular", name: "信念燈塔", quote: "相信自己，你比昨天更強大。" },
+  { type: "regular", name: "精舍", quote: "相信自己，你比昨天更強大。" },
 ];
 
 const TILE_COUNT = TILES.length; // 20
@@ -208,11 +209,43 @@ function dealSymbols() {
   TILES.forEach((tile, i) => (tile.icon = deck[i]));
 }
 
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// always on the board (日本 總本部 / 應現院, 東京都立川市)
+const TEMPLES_REQUIRED = ["真如苑總本部、真澄寺", "應現院"];
+// 全球真如苑 locations (Global Shinnyo-en map); the remaining regular tiles get a random pick
+const TEMPLES = [
+  // 亞洲
+  "真如苑台灣", "真如苑韓國", "真如苑香港", "真如苑泰國", "真如苑新加坡", "真如苑斯里蘭卡",
+  // 歐洲
+  "真如苑法國(歐洲本部)", "真如苑義大利", "真如苑德國慕尼黑", "真如苑比利時", "真如苑英國",
+  // 美洲
+  "真如苑夏威夷", "真如苑美國本部", "洛杉磯精舍", "西雅圖精舍", "紐約精舍", "芝加哥精舍", "真如苑巴西",
+  // 大洋洲
+  "真如苑澳洲",
+];
+
+// every page load: the required ones plus random others, placed in random order
+function dealTemples() {
+  const regular = TILES.filter((t) => t.type === "regular");
+  const others = shuffle(TEMPLES).slice(0, regular.length - TEMPLES_REQUIRED.length);
+  const names = shuffle([...TEMPLES_REQUIRED, ...others]);
+  regular.forEach((tile, i) => (tile.name = names[i]));
+}
+
 // ---------- build board ----------
 const tileEls = [];
 
 function buildBoard() {
   dealSymbols();
+  dealTemples();
   TILES.forEach((tile, i) => {
     const [row, col] = GRID_POS[i];
     const el = document.createElement("div");
@@ -221,7 +254,7 @@ function buildBoard() {
     el.style.gridColumn = col;
     el.innerHTML = `
       <div class="tile-icon">${tile.icon}</div>
-      <div class="tile-name">${tile.name}</div>
+      <div class="tile-name">${tile.name.replace(/^真如苑/, "真如苑<wbr>").replace("(", "<wbr>(").replace("、", "、<wbr>")}</div>
     `;
     boardEl.insertBefore(el, centerPanel);
     tileEls.push(el);
@@ -255,16 +288,53 @@ function fitBoard() {
     boardEl.style.setProperty("--pass-scale", (1 + TILE_PASS_GROW / base).toFixed(3));
     boardEl.style.setProperty("--land-scale", (1 + TILE_LAND_GROW / base).toFixed(3));
   }
+  fitTileNames();
+}
+
+// Largest shared font size at which every place-name tile fits: no word cut mid-way,
+// at most 3 lines, and icon + name inside the tile. Big desktop tiles → big text.
+const NAME_MIN = 8;
+const NAME_MAX = 26;
+function fitTileNames() {
+  const items = tileEls
+    .filter((_, i) => TILES[i].type === "regular" || TILES[i].type === "start")
+    .map((tile) => ({ tile, name: tile.querySelector(".tile-name"), icon: tile.querySelector(".tile-icon") }))
+    .filter(({ name }) => name.offsetParent !== null && getComputedStyle(name).display !== "none");
+  boardEl.style.removeProperty("--name-size");
+  if (!items.length) return;
+
+  const fits = (size) => {
+    boardEl.style.setProperty("--name-size", `${size}px`);
+    return items.every(({ tile, name, icon }) => {
+      const iconH = icon && getComputedStyle(icon).display !== "none" ? icon.offsetHeight + 4 : 0;
+      return (
+        name.scrollWidth <= name.clientWidth + 0.5 &&
+        name.offsetHeight <= size * 1.2 * 3 + 1 &&
+        iconH + name.offsetHeight <= tile.clientHeight - 6
+      );
+    });
+  };
+
+  let lo = NAME_MIN;
+  let hi = NAME_MAX;
+  if (!fits(lo)) return fits(lo); // too cramped even at the minimum: keep it at the minimum
+  while (hi - lo > 0.5) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  boardEl.style.setProperty("--name-size", `${lo.toFixed(1)}px`);
 }
 
 function placeTokenInstant(index) {
   const tileEl = tileEls[index];
-  const boardRect = boardEl.getBoundingClientRect();
-  const rect = tileEl.getBoundingClientRect();
+  // layout offsets (relative to the board), unaffected by the tiles' scale animations
+  const w = tileEl.offsetWidth;
+  const h = tileEl.offsetHeight;
   // sit in the tile's top-right corner so the token never covers the tile's icon/name
-  const inset = Math.max(3, Math.min(rect.width, rect.height) * 0.06);
-  const x = rect.right - boardRect.left - tokenEl.offsetWidth - inset;
-  const y = rect.top - boardRect.top + inset;
+  const inset = Math.max(3, Math.min(w, h) * 0.06);
+  const x = tileEl.offsetLeft + w - tokenEl.offsetWidth - inset;
+  const y = tileEl.offsetTop + inset;
   tokenEl.style.left = `${x}px`;
   tokenEl.style.top = `${y}px`;
 }
