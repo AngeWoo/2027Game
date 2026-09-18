@@ -577,19 +577,31 @@ body {
   z-index: 45;
   overflow: hidden;
 }
-.confetti-piece {
+/* 機會: golden burst */
+.fx-chip,
+.fx-star {
   position: absolute;
-  top: -20px;
-  width: 8px;
-  height: 14px;
-  opacity: 0.9;
-  animation: confetti-fall linear forwards;
+  will-change: transform, opacity;
 }
-@keyframes confetti-fall {
-  to {
-    transform: translateY(110vh) rotate(540deg);
-    opacity: 0;
-  }
+.fx-chip {
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(255, 209, 102, 0.7);
+}
+.fx-star {
+  font-size: 18px;
+  line-height: 1;
+  text-shadow: 0 0 8px currentColor;
+}
+.fx-star::before { content: "✦"; }
+
+/* 命運: drifting petals */
+.fx-petal {
+  position: absolute;
+  border-radius: 0 80% 0 80%;
+  box-shadow: 0 0 10px rgba(192, 74, 160, 0.45);
+  will-change: transform, opacity;
 }
 
 /* ---------- responsive ---------- */

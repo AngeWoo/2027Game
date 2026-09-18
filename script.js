@@ -109,14 +109,22 @@ const SFX = (() => {
     landRegular() {
       [523.25, 659.25].forEach((f, i) => tone({ freq: f, duration: 0.22, type: "sine", volume: 0.2, delay: i * 0.08 }));
     },
+    // 機會: bright rising C-major fanfare + high sparkle pings
     landChance() {
-      [523.25, 659.25, 783.99].forEach((f, i) =>
-        tone({ freq: f, duration: 0.2, type: "triangle", volume: 0.2, delay: i * 0.09 })
+      [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) =>
+        tone({ freq: f, duration: 0.22, type: "triangle", volume: 0.2, delay: i * 0.07 })
       );
+      tone({ freq: 1046.5, duration: 0.6, type: "sine", volume: 0.14, delay: 0.38 });
+      for (let i = 0; i < 6; i++) {
+        tone({ freq: 2200 + Math.random() * 1600, duration: 0.08, type: "sine", volume: 0.06, delay: 0.42 + i * 0.07 });
+      }
     },
+    // 命運: low gong, then slow, mysterious A-minor(add9) bells
     landFate() {
-      [392, 466.16, 587.33].forEach((f, i) =>
-        tone({ freq: f, duration: 0.26, type: "sawtooth", volume: 0.13, delay: i * 0.1 })
+      tone({ freq: 98, freqEnd: 92, duration: 1.8, type: "sine", volume: 0.32 });
+      tone({ freq: 196, freqEnd: 188, duration: 1.2, type: "triangle", volume: 0.1 });
+      [440, 523.25, 659.25, 987.77].forEach((f, i) =>
+        tone({ freq: f, duration: 1.1, type: "sine", volume: 0.12, delay: 0.25 + i * 0.22 })
       );
     },
     landStart() {
@@ -289,34 +297,111 @@ function showToast(text) {
   showToast._t = setTimeout(() => toastEl.classList.remove("show"), 1600);
 }
 
-function spawnConfetti() {
-  const colors = ["#7c5cff", "#ff5ca8", "#35e0ff", "#ffd166", "#35e0a0"];
-  const count = 36;
-  for (let i = 0; i < count; i++) {
-    const piece = document.createElement("div");
-    piece.className = "confetti-piece";
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    piece.style.background = color;
-    piece.style.left = `${Math.random() * 100}vw`;
-    piece.style.animationDuration = `${1.4 + Math.random() * 1.2}s`;
-    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
-    piece.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
-    confettiLayer.appendChild(piece);
-    setTimeout(() => piece.remove(), 3000);
+const rand = (min, max) => min + Math.random() * (max - min);
+const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function addPiece(className, style) {
+  const el = document.createElement("div");
+  el.className = className;
+  Object.assign(el.style, style);
+  confettiLayer.appendChild(el);
+  return el;
+}
+
+// 機會: golden fireworks burst from the centre — pieces shoot out, then fall under gravity
+function spawnChanceBurst() {
+  const colors = ["#ffd166", "#ff9f43", "#ffe8a3", "#ffb627", "#fff6d5"];
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight * 0.42;
+  const reach = Math.min(window.innerWidth, window.innerHeight) * 0.55;
+  for (let i = 0; i < 70; i++) {
+    const star = i % 4 === 0;
+    const color = pickOne(colors);
+    const el = addPiece(star ? "fx-star" : "fx-chip", {
+      left: `${cx}px`,
+      top: `${cy}px`,
+      ...(star ? { color } : { background: color }),
+    });
+    const angle = rand(0, Math.PI * 2);
+    const dist = rand(0.35, 1) * reach;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - reach * 0.25;
+    const spin = rand(-720, 720);
+    const dur = rand(1500, 2300);
+    el.animate(
+      [
+        { transform: "translate(-50%, -50%) scale(0.3) rotate(0deg)", opacity: 1 },
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1) rotate(${spin * 0.5}deg)`, opacity: 1, offset: 0.35, easing: "cubic-bezier(.3,0,.8,.6)" },
+        { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + reach * 0.9}px)) scale(0.9) rotate(${spin}deg)`, opacity: 0 },
+      ],
+      { duration: dur, easing: "cubic-bezier(.1,.8,.3,1)", fill: "forwards" }
+    ).finished.then(() => el.remove());
   }
 }
 
-// ---------- quotes (same Google Sheet as Train17/index2) ----------
-const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSJvh4hp9JZWYOKyACPM-TDXKe-4aMTNQfqNxbBloYlZjsZJ_2wSVSjL88TS340Bf7CeBqVwIXCM3KA/pub?gid=0&single=true&output=csv";
-const FALLBACK_QUOTES = [
-  "01 具備充滿自己特性的美德", "02 勿忘身為真如教徒", "03 溫柔且堅強", "04 不以自我為中心",
-  "05 莫讓他人難過", "06 批評別人之前先反省自己", "07 不在背後道人長短", "08 勿堅持己見",
-  "09 設身處地為他人著想", "10 身心清淨", "11 經常微笑待人", "12 成為令人珍惜的人",
-  "13 為人誠實", "14 不引起爭執", "15 謙恭穩重", "16 尊重他人", "17 不說不必要的話",
-];
-let quotes = FALLBACK_QUOTES;
-let lastQuoteIndex = -1;
+// 命運: mysterious petals drifting slowly down from the top, swaying and turning
+function spawnFatePetals() {
+  const colors = [
+    "linear-gradient(135deg, #ff8fc4, #c04aa0)",
+    "linear-gradient(135deg, #c9a4ff, #6a3fd6)",
+    "linear-gradient(135deg, #8fb8ff, #3b4fc9)",
+    "linear-gradient(135deg, #ffc2e0, #ff5c8a)",
+  ];
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  for (let i = 0; i < 34; i++) {
+    const size = rand(10, 20);
+    const el = addPiece("fx-petal", {
+      left: `${rand(0, w)}px`,
+      top: `${-size * 2}px`,
+      width: `${size}px`,
+      height: `${size * 1.4}px`,
+      background: pickOne(colors),
+    });
+    const sway = rand(30, 90) * (Math.random() < 0.5 ? -1 : 1);
+    const turn = rand(180, 540) * (Math.random() < 0.5 ? -1 : 1);
+    const fall = h + size * 4;
+    el.animate(
+      [
+        { transform: "translate(0, 0) rotate(0deg) rotateY(0deg)", opacity: 0 },
+        { transform: `translate(${sway}px, ${fall * 0.25}px) rotate(${turn * 0.25}deg) rotateY(180deg)`, opacity: 0.95, offset: 0.15 },
+        { transform: `translate(${-sway}px, ${fall * 0.55}px) rotate(${turn * 0.55}deg) rotateY(360deg)`, opacity: 0.9, offset: 0.55 },
+        { transform: `translate(${sway * 0.6}px, ${fall}px) rotate(${turn}deg) rotateY(540deg)`, opacity: 0 },
+      ],
+      { duration: rand(3200, 4800), delay: rand(0, 900), easing: "linear", fill: "both" }
+    ).finished.then(() => el.remove());
+  }
+}
+
+const LAND_FX = { chance: spawnChanceBurst, fate: spawnFatePetals };
+
+// ---------- quotes ----------
+// Each pool: live Google Sheet first; if blocked/offline, the local snapshot; then a built-in list.
+// 苑歌 pool — same sheet as Train17/index2; used by the regular tiles.
+const YUANGE = {
+  sheet:
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSJvh4hp9JZWYOKyACPM-TDXKe-4aMTNQfqNxbBloYlZjsZJ_2wSVSjL88TS340Bf7CeBqVwIXCM3KA/pub?gid=0&single=true&output=csv",
+  local: "quotes.csv",
+  rows: [
+    "01 具備充滿自己特性的美德", "02 勿忘身為真如教徒", "03 溫柔且堅強", "04 不以自我為中心",
+    "05 莫讓他人難過", "06 批評別人之前先反省自己", "07 不在背後道人長短", "08 勿堅持己見",
+    "09 設身處地為他人著想", "10 身心清淨", "11 經常微笑待人", "12 成為令人珍惜的人",
+    "13 為人誠實", "14 不引起爭執", "15 謙恭穩重", "16 尊重他人", "17 不說不必要的話",
+  ],
+  last: -1,
+};
+// 機會 / 命運 pool — same sheet as wt_2025/index.html
+const WT = {
+  sheet:
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vRlArx460gMLKbiCQT1yroqX1tEkLFGRjBn7CB8f4eXtuek_5HKQ0FEQhZ1cAUfeDZl1m_SagzPGrHE/pub?gid=0&single=true&output=csv",
+  local: "wt_quotes.csv",
+  rows: [
+    "(摘錄《這時候。深呼吸》)心痛悲傷時，失去信心時，請閉上眼睛想一想，自己是與佛陀同在的。",
+    "(摘錄《這時候。深呼吸》)想要努力，想做得更好，這也是一種幸福。",
+    "(摘錄《真如人生》)抬起頭、深呼吸，一步一步走出去，積極面對人生。",
+  ],
+  last: -1,
+};
 
 async function loadCsv(url) {
   const res = await fetch(url);
@@ -329,11 +414,10 @@ async function loadCsv(url) {
   return rows;
 }
 
-// live sheet first; if blocked/offline use the local snapshot, then the built-in list
-async function fetchQuotes() {
-  for (const url of [SHEET_CSV_URL, "quotes.csv"]) {
+async function fetchPool(pool) {
+  for (const url of [pool.sheet, pool.local]) {
     try {
-      quotes = await loadCsv(url);
+      pool.rows = await loadCsv(url);
       return;
     } catch (err) {
       console.warn(`讀取 ${url} 失敗:`, err);
@@ -342,8 +426,13 @@ async function fetchQuotes() {
   console.error("獲取 Sheet 數據失敗，使用默認數據");
 }
 
-// "《92》佛陀之恩澤,廣庇全天下(苑歌月曆–常樂1)" → { num, text, source }
-function parseQuote(raw) {
+function fetchQuotes() {
+  fetchPool(YUANGE);
+  fetchPool(WT);
+}
+
+// 苑歌: "《92》佛陀之恩澤,廣庇全天下(苑歌月曆–常樂1)" → { num, text, source }
+function parseYuange(raw) {
   let num = "";
   let text = raw.trim();
   let source = "";
@@ -360,11 +449,18 @@ function parseQuote(raw) {
   return { num, text, source };
 }
 
-function pickQuote() {
-  let i = Math.floor(Math.random() * quotes.length);
-  if (quotes.length > 1 && i === lastQuoteIndex) i = (i + 1) % quotes.length;
-  lastQuoteIndex = i;
-  return parseQuote(quotes[i]);
+// wt_2025: "(摘錄《真如人生》)誠實面對自己的感覺是很重要的。" → { text, source: "《真如人生》" }
+function parseWt(raw) {
+  const m = raw.trim().match(/^[(（]([^)）]*)[)）]\s*(.*)$/);
+  if (!m) return { num: "", text: raw.trim(), source: "" };
+  return { num: "", text: m[2].trim(), source: m[1].replace(/^摘錄\s*/, "").trim() };
+}
+
+function pickFrom(pool) {
+  let i = Math.floor(Math.random() * pool.rows.length);
+  if (pool.rows.length > 1 && i === pool.last) i = (i + 1) % pool.rows.length;
+  pool.last = i;
+  return pool.rows[i];
 }
 
 // ---------- modal ----------
@@ -376,16 +472,18 @@ const LAND_SOUND = {
 };
 
 function openModal(tile) {
-  const q = pickQuote();
+  const isLuck = tile.type === "chance" || tile.type === "fate";
+  const q = isLuck ? parseWt(pickFrom(WT)) : parseYuange(pickFrom(YUANGE));
   modalIcon.innerHTML = tile.icon;
   modalType.textContent = "台灣真如苑";
   modalName.textContent = q.source || tile.name;
-  modalNum.textContent = q.num ? `《${q.num}》` : "";
+  // 機會/命運 show the tile's name where 苑歌 shows its number
+  modalNum.textContent = isLuck ? tile.name : q.num ? `《${q.num}》` : "";
   modalQuote.textContent = q.text || tile.quote;
   modalOverlay.classList.add("show");
   (LAND_SOUND[tile.type] || LAND_SOUND.regular)();
-  if (tile.type !== "regular" && tile.type !== "start") {
-    spawnConfetti();
+  if (LAND_FX[tile.type] && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    LAND_FX[tile.type]();
   }
 }
 
