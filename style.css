@@ -266,18 +266,19 @@ body {
 .tile.type-regular { border-color: var(--regular); }
 
 .tile.active-tile {
-  transform: scale(1.12);
+  transform: scale(var(--land-scale, 1.12));
   z-index: 3;
   box-shadow: 0 0 0 2px var(--gold), 0 0 24px rgba(255,209,102,0.6);
   background: rgba(255,209,102,0.12);
 }
 
 .tile.passing {
+  z-index: 2;
   animation: pulse-pass 0.35s ease;
 }
 @keyframes pulse-pass {
   0% { transform: scale(1); }
-  50% { transform: scale(1.18); box-shadow: 0 0 18px rgba(124,92,255,0.6); }
+  50% { transform: scale(var(--pass-scale, 1.18)); box-shadow: 0 0 18px rgba(124,92,255,0.6); }
   100% { transform: scale(1); }
 }
 

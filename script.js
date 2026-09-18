@@ -225,6 +225,8 @@ function buildBoard() {
 // sane bounds so tiles never get absurdly flat (wide screens) or thin (tall phones).
 const BOARD_MAX_WIDE = 2.0; //  width  ≤ 2.0 × height
 const BOARD_MAX_TALL = 2.0; //  height ≤ 2.0 × width
+const TILE_PASS_GROW = 10; // px added while the token passes a tile
+const TILE_LAND_GROW = 7; //  px added to the tile the token lands on
 function fitBoard() {
   if (!stageEl || !boardWrapEl) return;
   const cs = getComputedStyle(stageEl);
@@ -236,6 +238,15 @@ function fitBoard() {
   h = Math.min(h, w * BOARD_MAX_TALL);
   boardWrapEl.style.width = `${Math.floor(w)}px`;
   boardWrapEl.style.height = `${Math.floor(h)}px`;
+
+  // grow highlighted tiles by a fixed number of pixels (what looks right on a phone),
+  // not a fixed percentage — big desktop tiles would otherwise balloon over their neighbours
+  const tile = tileEls[1];
+  if (tile) {
+    const base = Math.min(tile.offsetWidth, tile.offsetHeight) || 1;
+    boardEl.style.setProperty("--pass-scale", (1 + TILE_PASS_GROW / base).toFixed(3));
+    boardEl.style.setProperty("--land-scale", (1 + TILE_LAND_GROW / base).toFixed(3));
+  }
 }
 
 function placeTokenInstant(index) {
