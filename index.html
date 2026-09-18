@@ -2,9 +2,9 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>人生大富翁 · 人生小語</title>
-<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>寒修行大富翁 · 人生小語</title>
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -13,6 +13,7 @@
   <div class="blob blob-b"></div>
   <div class="blob blob-c"></div>
   <div class="stars" id="stars"></div>
+  <canvas class="snow" id="snow"></canvas>
 </div>
 
 <button id="soundToggle" class="sound-toggle" aria-label="切換音效" title="切換音效">
@@ -20,8 +21,8 @@
 </button>
 
 <header class="page-head">
-  <h1><span class="grad-text">人生大富翁</span></h1>
-  <p class="subtitle">擲出骰子，走向未知，收下一句屬於你的人生小語</p>
+  <h1><span class="grad-text">寒修行大富翁</span></h1>
+  <p class="subtitle">擲出骰子，走向未知，收下一句屬於你的真如苑歌</p>
 </header>
 
 <main class="stage">
@@ -30,33 +31,12 @@
       <!-- tiles injected by JS -->
       <div class="center-panel" id="centerPanel">
         <div class="dice-area">
-          <div class="dice" id="dice">
-            <span id="diceNumber">?</span>
-          </div>
+          <div class="dice-tray" id="diceTray" aria-hidden="true"></div>
+          <div class="dice-total" id="diceTotal" aria-live="polite">?</div>
           <button id="rollBtn" class="roll-btn">
             <span>擲骰子</span>
           </button>
-          <p class="hint">隨機產生 1–20 步</p>
-        </div>
-
-        <div class="status-area">
-          <div class="status-row">
-            <span class="label">目前位置</span>
-            <span class="value" id="posLabel">起點</span>
-          </div>
-          <div class="status-row">
-            <span class="label">上次骰數</span>
-            <span class="value" id="rollLabel">--</span>
-          </div>
-          <div class="status-row">
-            <span class="label">已走圈數</span>
-            <span class="value" id="lapLabel">0</span>
-          </div>
-        </div>
-
-        <div class="history-area">
-          <div class="history-title">歷程紀錄</div>
-          <ul id="historyList" class="history-list"></ul>
+          <p class="hint">三顆骰子 · 3–18 步</p>
         </div>
       </div>
       <div class="token" id="token">🚀</div>
@@ -71,6 +51,7 @@
     <div class="modal-icon" id="modalIcon">✨</div>
     <div class="modal-type" id="modalType">人生小語</div>
     <h2 class="modal-name" id="modalName">格子名稱</h2>
+    <div class="modal-num" id="modalNum"></div>
     <p class="modal-quote" id="modalQuote">這裡會顯示一句話。</p>
     <button class="modal-close" id="modalClose">繼續前進</button>
   </div>
@@ -78,6 +59,6 @@
 
 <div class="confetti-layer" id="confettiLayer"></div>
 
-<script src="script.js"></script>
+<script src="script.js?v=20"></script>
 </body>
 </html>
