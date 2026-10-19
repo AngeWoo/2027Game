@@ -309,94 +309,122 @@ body {
   gap: 8px;
 }
 
-/* ---------- bunny dice ---------- */
+/* ---------- sheep dice ---------- */
 .center-panel { container-type: size; }
 
 .dice-tray {
-  --bunny: clamp(28px, min(24cqw, 30cqh), 150px);
+  --sheep: clamp(28px, min(24cqw, 30cqh), 150px);
   display: flex;
   justify-content: center;
-  gap: calc(var(--bunny) * 0.22);
-  padding-top: calc(var(--bunny) * 0.15);
+  gap: calc(var(--sheep) * 0.22);
+  padding-top: calc(var(--sheep) * 0.15);
   position: relative;
   z-index: 5;
 }
 
-.bunny-slot {
+.sheep-slot {
   position: relative;
-  width: var(--bunny);
-  height: calc(var(--bunny) * 1.15);
+  width: var(--sheep);
+  height: calc(var(--sheep) * 1.15);
 }
 
-.bunny-shadow {
+.sheep-shadow {
   position: absolute;
   left: 10%;
   right: 10%;
   bottom: 0;
-  height: calc(var(--bunny) * 0.2);
+  height: calc(var(--sheep) * 0.2);
   border-radius: 50%;
   background: radial-gradient(ellipse at center, rgba(0,0,0,0.5), transparent 70%);
 }
 
-.bunny-hop {
+.sheep-hop {
   position: absolute;
   left: 0;
   top: 0;
-  width: var(--bunny);
-  height: calc(var(--bunny) * 1.15);
+  width: var(--sheep);
+  height: calc(var(--sheep) * 1.15);
   transform-origin: 50% 100%;
 }
 
-.bunny-spin {
+.sheep-spin {
   position: absolute;
   inset: 0;
   transform-origin: 50% 62%;
 }
 
-.bunny {
+.sheep {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
   transform-origin: 50% 100%;
-  filter: drop-shadow(0 calc(var(--bunny) * 0.03) calc(var(--bunny) * 0.05) rgba(0, 0, 0, 0.35));
-  animation: bunny-breathe 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 calc(var(--sheep) * 0.03) calc(var(--sheep) * 0.05) rgba(0, 0, 0, 0.35));
+  animation: sheep-breathe 2.8s ease-in-out infinite;
 }
-.bunny-slot:nth-child(2) .bunny { animation-delay: -0.9s; }
-.bunny-slot:nth-child(3) .bunny { animation-delay: -1.8s; }
+.sheep-slot:nth-child(2) .sheep { animation-delay: -0.9s; }
+.sheep-slot:nth-child(3) .sheep { animation-delay: -1.8s; }
 
-.bunny.v0 { --fur: #fffdfe; --fur-line: #e7c4d2; --ear-in: #ffb8cd; }
-.bunny.v1 { --fur: #fff1e2; --fur-line: #ebc9a6; --ear-in: #ffc0a8; }
-.bunny.v2 { --fur: #f3edff; --fur-line: #cfc2ee; --ear-in: #e8b9f0; }
+.sheep.v0 { --fur: #fffdfe; --fur-line: #e7c4d2; --ear-in: #ffb8cd; --face: #ffeef4; --leg: #d9a7bb; }
+.sheep.v1 { --fur: #fff1e2; --fur-line: #ebc9a6; --ear-in: #ffc0a8; --face: #ffe6cf; --leg: #d8a881; }
+.sheep.v2 { --fur: #f3edff; --fur-line: #cfc2ee; --ear-in: #e8b9f0; --face: #efe6ff; --leg: #b3a3dc; }
 
-.bunny .fur {
+.sheep .fur {
   fill: var(--fur);
   stroke: var(--fur-line);
   stroke-width: 2.2;
   stroke-linejoin: round;
 }
-.bunny .ear-in { fill: var(--ear-in); }
-.bunny .pad { fill: var(--ear-in); opacity: 0.85; }
-.bunny .shade { fill: var(--fur-line); opacity: 0.22; }
+.sheep .ear-in { fill: var(--ear-in); }
+.sheep .shade { fill: var(--fur-line); opacity: 0.22; }
+
+/* wool: the fat layer peeks out around the filled one as a single outline */
+.sheep .wool-edge {
+  fill: var(--fur-line);
+  stroke: var(--fur-line);
+  stroke-width: 4.4;
+  stroke-linejoin: round;
+}
+.sheep .wool { fill: var(--fur); }
+.sheep .curl {
+  fill: none;
+  stroke: var(--fur-line);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+.sheep .face {
+  fill: var(--face);
+  stroke: var(--fur-line);
+  stroke-width: 2.2;
+}
+.sheep .horn {
+  fill: none;
+  stroke: #e0bb8a;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.sheep .leg { fill: var(--leg); }
+.sheep .hoof { fill: #6b4a3a; }
 
 /* face states: calm (idle) vs. cheering (in the air) */
-.bunny .eyes-happy,
-.bunny .mouth-open { display: none; }
-.bunny-slot.is-rolling .eyes-happy,
-.bunny-slot.is-rolling .mouth-open { display: inline; }
-.bunny-slot.is-rolling .eyes-open,
-.bunny-slot.is-rolling .mouth-closed { display: none; }
+.sheep .eyes-happy,
+.sheep .mouth-open { display: none; }
+.sheep-slot.is-rolling .eyes-happy,
+.sheep-slot.is-rolling .mouth-open { display: inline; }
+.sheep-slot.is-rolling .eyes-open,
+.sheep-slot.is-rolling .mouth-closed { display: none; }
 
 /* idle life: breathing, blinking, ear twitch */
-.bunny .blink { transform-box: fill-box; transform-origin: center; animation: bunny-blink 4.6s infinite; }
-.bunny .ear { transform-box: fill-box; transform-origin: 50% 100%; }
-.bunny .ear-l { animation: ear-twitch 5.5s ease-in-out infinite; }
-.bunny .ear-r { animation: ear-twitch 5.5s ease-in-out 2.4s infinite; }
-@keyframes bunny-breathe {
+.sheep .blink { transform-box: fill-box; transform-origin: center; animation: sheep-blink 4.6s infinite; }
+.sheep .ear { transform-box: fill-box; transform-origin: 50% 100%; }
+.sheep .ear-l { animation: ear-twitch 5.5s ease-in-out infinite; }
+.sheep .ear-r { animation: ear-twitch 5.5s ease-in-out 2.4s infinite; }
+@keyframes sheep-breathe {
   0%, 100% { transform: scale(1, 1); }
   50% { transform: scale(1.025, 0.975); }
 }
-@keyframes bunny-blink {
+@keyframes sheep-blink {
   0%, 92%, 100% { transform: scaleY(1); }
   95% { transform: scaleY(0.1); }
 }
@@ -406,26 +434,26 @@ body {
   94% { transform: rotate(3deg); }
 }
 
-.bunny-slot.is-rolling .bunny,
-.bunny-slot.is-rolling .blink { animation: none; }
-.bunny-slot.is-rolling .ear { animation: ear-flap 0.16s ease-in-out infinite alternate; }
-.bunny-slot.is-rolling .ear-r { animation-direction: alternate-reverse; }
+.sheep-slot.is-rolling .sheep,
+.sheep-slot.is-rolling .blink { animation: none; }
+.sheep-slot.is-rolling .ear { animation: ear-flap 0.16s ease-in-out infinite alternate; }
+.sheep-slot.is-rolling .ear-r { animation-direction: alternate-reverse; }
 @keyframes ear-flap {
   from { transform: rotate(-10deg); }
   to { transform: rotate(10deg); }
 }
 
-.bunny .badge { transform-box: fill-box; transform-origin: center; }
-.bunny .badge.pop { animation: badge-pop 0.4s cubic-bezier(.3, 1.6, .5, 1); }
+.sheep .badge { transform-box: fill-box; transform-origin: center; }
+.sheep .badge.pop { animation: badge-pop 0.4s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes badge-pop {
   from { transform: scale(0.5); }
   to { transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bunny,
-  .bunny .blink,
-  .bunny .ear { animation: none !important; }
+  .sheep,
+  .sheep .blink,
+  .sheep .ear { animation: none !important; }
 }
 
 .dice-total {

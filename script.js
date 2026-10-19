@@ -582,49 +582,75 @@ soundToggle.addEventListener("click", () => {
   syncSoundIcon();
 });
 
-// ---------- dice (cute bunnies) ----------
+// ---------- dice (cute sheep) ----------
 const DICE_COUNT = 3;
 
-// hand-drawn bunny: viewBox 100x115, the number sits on a badge held at its belly
-function bunnySVG(skin) {
-  // skin 0: white + pink bow · skin 1: peach, one ear flopped out · skin 2: lavender + flower
-  const earR = skin === 1 ? 34 : 12;
+// hand-drawn sheep: viewBox 100x115, the number sits on a badge held at its belly
+function sheepSVG(skin) {
+  // skin 0: cream + pink bow · skin 1: toffee, one ear tipped out · skin 2: lavender + flower
+  const earR = skin === 1 ? 22 : 6;
   const accessory = [
-    `<g><path d="M30 47 L19 41 L19 53 Z" fill="#ff6fa0"/><path d="M30 47 L41 41 L41 53 Z" fill="#ff6fa0"/><circle cx="30" cy="47" r="3.4" fill="#ff3f82"/></g>`,
+    `<g><path d="M30 44 L19 38 L19 50 Z" fill="#ff6fa0"/><path d="M30 44 L41 38 L41 50 Z" fill="#ff6fa0"/><circle cx="30" cy="44" r="3.4" fill="#ff3f82"/></g>`,
     "",
-    `<g stroke="#ff9db5" stroke-width=".6" fill="#ffd6e4"><circle cx="74" cy="44" r="3.4"/><circle cx="71.2" cy="47.8" r="3.4"/><circle cx="66.8" cy="46.4" r="3.4"/><circle cx="66.8" cy="41.6" r="3.4"/><circle cx="71.2" cy="40.2" r="3.4"/><circle cx="70" cy="44" r="2.4" fill="#ffd166" stroke="none"/></g>`,
+    `<g stroke="#ff9db5" stroke-width=".6" fill="#ffd6e4"><circle cx="74" cy="41" r="3.4"/><circle cx="71.2" cy="44.8" r="3.4"/><circle cx="66.8" cy="43.4" r="3.4"/><circle cx="66.8" cy="38.6" r="3.4"/><circle cx="71.2" cy="37.2" r="3.4"/><circle cx="70" cy="41" r="2.4" fill="#ffd166" stroke="none"/></g>`,
   ][skin];
 
-  return `<svg class="bunny v${skin}" viewBox="0 0 100 115" aria-hidden="true">
-    <g transform="rotate(-12 32 48)"><g class="ear ear-l">
-      <ellipse class="fur" cx="32" cy="26" rx="11" ry="25"/><ellipse class="ear-in" cx="32" cy="29" rx="5.5" ry="16"/>
+  // the wool is a cluster of puffs, drawn twice: once fat for the outline,
+  // once filled on top, so the overlaps read as one fluffy silhouette
+  const wool = `
+    <ellipse cx="50" cy="74" rx="33" ry="27"/>
+    <circle cx="50" cy="42" r="13"/>
+    <circle cx="28" cy="48" r="12"/><circle cx="72" cy="48" r="12"/>
+    <circle cx="15" cy="66" r="12"/><circle cx="85" cy="66" r="12"/>
+    <circle cx="19" cy="86" r="11"/><circle cx="81" cy="86" r="11"/>
+    <circle cx="38" cy="96" r="11"/><circle cx="62" cy="96" r="11"/>`;
+
+  return `<svg class="sheep v${skin}" viewBox="0 0 100 115" aria-hidden="true">
+    <g class="legs">
+      <rect class="leg" x="28" y="92" width="10" height="20" rx="5"/>
+      <rect class="leg" x="62" y="92" width="10" height="20" rx="5"/>
+      <rect class="hoof" x="28" y="104" width="10" height="8" rx="4"/>
+      <rect class="hoof" x="62" y="104" width="10" height="8" rx="4"/>
+    </g>
+    <g class="wool-edge">${wool}</g>
+    <g class="wool">${wool}</g>
+    <ellipse class="shade" cx="50" cy="92" rx="28" ry="9"/>
+    <g class="curl">
+      <path d="M30 80 Q36 74 42 80"/><path d="M58 80 Q64 74 70 80"/>
+      <path d="M22 68 Q28 62 34 68"/><path d="M66 68 Q72 62 78 68"/>
+    </g>
+    <g transform="rotate(-6 34 56)"><g class="ear ear-l">
+      <ellipse class="fur" cx="19" cy="62" rx="14" ry="8" transform="rotate(20 19 62)"/>
+      <ellipse class="ear-in" cx="20" cy="62.5" rx="8" ry="4" transform="rotate(20 20 62.5)"/>
     </g></g>
-    <g transform="rotate(${earR} 68 48)"><g class="ear ear-r">
-      <ellipse class="fur" cx="68" cy="26" rx="11" ry="25"/><ellipse class="ear-in" cx="68" cy="29" rx="5.5" ry="16"/>
+    <g transform="rotate(${-earR} 66 56)"><g class="ear ear-r">
+      <ellipse class="fur" cx="81" cy="62" rx="14" ry="8" transform="rotate(-20 81 62)"/>
+      <ellipse class="ear-in" cx="80" cy="62.5" rx="8" ry="4" transform="rotate(-20 80 62.5)"/>
     </g></g>
-    <ellipse class="fur" cx="32" cy="105" rx="13" ry="7.5"/><ellipse class="pad" cx="32" cy="107.5" rx="5" ry="3"/>
-    <ellipse class="fur" cx="68" cy="105" rx="13" ry="7.5"/><ellipse class="pad" cx="68" cy="107.5" rx="5" ry="3"/>
-    <ellipse class="fur" cx="50" cy="70" rx="38" ry="34"/>
-    <ellipse class="shade" cx="50" cy="94" rx="30" ry="10"/>
-    <ellipse cx="50" cy="46" rx="10" ry="3.5" fill="#fff" opacity=".6"/>
+    <g class="horn">
+      <path d="M36 50 Q27 46 26.5 53.5 Q26 60 33 59.5"/>
+      <path d="M64 50 Q73 46 73.5 53.5 Q74 60 67 59.5"/>
+    </g>
+    <ellipse class="face" cx="50" cy="63" rx="20" ry="17.5"/>
+    <ellipse cx="50" cy="51" rx="8" ry="2.6" fill="#fff" opacity=".5"/>
     ${accessory}
-    <ellipse cx="23" cy="72" rx="6.5" ry="4" fill="#ff9db5" opacity=".55"/>
-    <ellipse cx="77" cy="72" rx="6.5" ry="4" fill="#ff9db5" opacity=".55"/>
+    <ellipse cx="33" cy="70" rx="5.2" ry="3.2" fill="#ff9db5" opacity=".5"/>
+    <ellipse cx="67" cy="70" rx="5.2" ry="3.2" fill="#ff9db5" opacity=".5"/>
     <g class="eyes-open blink" fill="#3b2a3f">
-      <ellipse cx="35" cy="62" rx="4.8" ry="6.2"/><ellipse cx="65" cy="62" rx="4.8" ry="6.2"/>
-      <circle cx="33.4" cy="59.6" r="1.9" fill="#fff"/><circle cx="63.4" cy="59.6" r="1.9" fill="#fff"/>
-      <circle cx="36.8" cy="64.2" r=".9" fill="#fff"/><circle cx="66.8" cy="64.2" r=".9" fill="#fff"/>
+      <ellipse cx="41" cy="61" rx="4.4" ry="5.8"/><ellipse cx="59" cy="61" rx="4.4" ry="5.8"/>
+      <circle cx="39.6" cy="58.8" r="1.8" fill="#fff"/><circle cx="57.6" cy="58.8" r="1.8" fill="#fff"/>
+      <circle cx="42.6" cy="63.2" r=".9" fill="#fff"/><circle cx="60.6" cy="63.2" r=".9" fill="#fff"/>
     </g>
     <g class="eyes-happy" fill="none" stroke="#3b2a3f" stroke-width="2.6" stroke-linecap="round">
-      <path d="M30.5 63 Q35 56 39.5 63"/><path d="M60.5 63 Q65 56 69.5 63"/>
+      <path d="M36.5 62 Q41 55 45.5 62"/><path d="M54.5 62 Q59 55 63.5 62"/>
     </g>
-    <ellipse cx="50" cy="68" rx="3.2" ry="2.3" fill="#ff7fa1"/>
+    <ellipse cx="50" cy="70" rx="3.4" ry="2.4" fill="#ff7fa1"/>
     <g class="mouth-closed" fill="none" stroke="#c0728b" stroke-width="1.8" stroke-linecap="round">
-      <path d="M50 70.3 L50 73"/><path d="M50 73 Q45.5 78.5 41.5 74"/><path d="M50 73 Q54.5 78.5 58.5 74"/>
+      <path d="M50 72.4 L50 74.6"/><path d="M50 74.6 Q46 79.5 42.5 75.5"/><path d="M50 74.6 Q54 79.5 57.5 75.5"/>
     </g>
     <g class="mouth-open">
-      <path d="M43 72 Q50 72 57 72 Q55 80 50 80 Q45 80 43 72 Z" fill="#c9506f"/>
-      <ellipse cx="50" cy="77.6" rx="3.2" ry="1.7" fill="#ff8fa8"/>
+      <path d="M44 73 Q50 73 56 73 Q54.5 80.5 50 80.5 Q45.5 80.5 44 73 Z" fill="#c9506f"/>
+      <ellipse cx="50" cy="78.4" rx="3" ry="1.6" fill="#ff8fa8"/>
     </g>
     <g class="badge">
       <circle cx="50" cy="93" r="13" fill="#ffb340" stroke="#fff" stroke-width="2.4"/>
@@ -632,7 +658,6 @@ function bunnySVG(skin) {
         font-family="'PingFang TC','Noto Sans TC',-apple-system,sans-serif"
         fill="#fff" stroke="#d9700a" stroke-width=".9" style="paint-order:stroke">?</text>
     </g>
-    <circle class="fur" cx="36.5" cy="99" r="5.6"/><circle class="fur" cx="63.5" cy="99" r="5.6"/>
   </svg>`;
 }
 
@@ -641,16 +666,16 @@ const dice = [];
 function buildDice() {
   for (let i = 0; i < DICE_COUNT; i++) {
     const slot = document.createElement("div");
-    slot.className = "bunny-slot";
+    slot.className = "sheep-slot";
     slot.innerHTML = `
-      <div class="bunny-shadow"></div>
-      <div class="bunny-hop"><div class="bunny-spin">${bunnySVG(i % 3)}</div></div>`;
+      <div class="sheep-shadow"></div>
+      <div class="sheep-hop"><div class="sheep-spin">${sheepSVG(i % 3)}</div></div>`;
     diceTrayEl.appendChild(slot);
     const die = {
       slot,
-      hop: slot.querySelector(".bunny-hop"),
-      spin: slot.querySelector(".bunny-spin"),
-      shadow: slot.querySelector(".bunny-shadow"),
+      hop: slot.querySelector(".sheep-hop"),
+      spin: slot.querySelector(".sheep-spin"),
+      shadow: slot.querySelector(".sheep-shadow"),
       num: slot.querySelector(".num"),
       badge: slot.querySelector(".badge"),
       tilt: -6 + Math.random() * 12,
@@ -669,7 +694,7 @@ function rollOneDie(die, value, index) {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const duration = reduceMotion ? 450 : 1250 + Math.random() * 250;
   const delayMs = reduceMotion ? 0 : index * 90 + Math.random() * 60;
-  const amp = 0.85 + Math.random() * 0.35; // jump height, in bunny sizes
+  const amp = 0.85 + Math.random() * 0.35; // jump height, in sheep sizes
 
   // somersault in the air, still landing upright (a whole number of turns + a fresh little tilt)
   const from = die.tilt;
@@ -687,7 +712,7 @@ function rollOneDie(die, value, index) {
   );
 
   // bounces: jump → land → smaller hop → land → tiny hop → settle
-  const H = (k) => `translateY(calc(var(--bunny) * ${-amp * k}))`;
+  const H = (k) => `translateY(calc(var(--sheep) * ${-amp * k}))`;
   const up = "cubic-bezier(.2,.7,.4,1)";
   const down = "cubic-bezier(.6,0,.8,.4)";
   const hop = die.hop.animate(
