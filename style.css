@@ -589,6 +589,25 @@ body {
   overflow: visible;
   filter: drop-shadow(0 0 8px rgba(53, 224, 255, 0.55));
 }
+.modal-globe {
+  flex: none;
+  width: 1.5em;
+  height: 1.5em;
+  margin-inline: 0.25em;
+  overflow: visible;
+  filter: drop-shadow(0 0 8px rgba(53, 224, 255, 0.55));
+}
+.globe-land { animation: globe-spin 9s linear infinite; }
+.modal-overlay.show .modal-globe {
+  animation: globe-in 0.8s 0.15s cubic-bezier(.2, .8, .3, 1) both;
+}
+@keyframes globe-spin {
+  to { transform: translateX(-48px); }
+}
+@keyframes globe-in {
+  from { transform: translateX(50px) scale(0.4); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
 .plane-body {
   transform-box: fill-box;
   transform-origin: 50% 50%;
@@ -618,7 +637,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .plane-body,
   .plane-trail path,
-  .modal-overlay.show .modal-plane { animation: none; }
+  .globe-land,
+  .modal-overlay.show .modal-plane,
+  .modal-overlay.show .modal-globe { animation: none; }
 }
 
 .modal-name {
