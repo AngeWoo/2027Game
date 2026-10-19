@@ -152,7 +152,7 @@ const toastEl = document.getElementById("toast");
 const modalOverlay = document.getElementById("modalOverlay");
 const modalCard = document.getElementById("modalCard");
 const modalIcon = document.getElementById("modalIcon");
-const modalType = document.getElementById("modalType");
+const modalPlace = document.getElementById("modalPlace");
 const modalName = document.getElementById("modalName");
 const modalQuote = document.getElementById("modalQuote");
 const modalNum = document.getElementById("modalNum");
@@ -545,10 +545,9 @@ function openModal(tile) {
   const isLuck = tile.type === "chance" || tile.type === "fate";
   const q = isLuck ? parseWt(pickFrom(WT)) : parseYuange(pickFrom(YUANGE));
   modalIcon.innerHTML = tile.icon;
-  modalType.textContent = "台灣真如苑";
+  modalPlace.textContent = tile.name;
   modalName.textContent = q.source || tile.name;
-  // 機會/命運 show the tile's name where 苑歌 shows its number
-  modalNum.textContent = isLuck ? tile.name : q.num ? `《${q.num}》` : "";
+  modalNum.textContent = q.num ? `《${q.num}》` : "";
   modalQuote.textContent = q.text || tile.quote;
   modalOverlay.classList.add("show");
   (LAND_SOUND[tile.type] || LAND_SOUND.regular)();
@@ -582,65 +581,80 @@ soundToggle.addEventListener("click", () => {
   syncSoundIcon();
 });
 
-// ---------- dice (3D cubes) ----------
+// ---------- dice (cute bunnies) ----------
 const DICE_COUNT = 3;
-// pip slots on a 3x3 grid (1..9, row-major)
-const PIPS = {
-  1: [5],
-  2: [3, 7],
-  3: [3, 5, 7],
-  4: [1, 3, 7, 9],
-  5: [1, 3, 5, 7, 9],
-  6: [1, 3, 4, 6, 7, 9],
-};
-// how each face sits on the cube
-const FACE_TRANSFORM = {
-  1: "rotateY(0deg)",
-  6: "rotateY(180deg)",
-  3: "rotateY(90deg)",
-  4: "rotateY(-90deg)",
-  2: "rotateX(90deg)",
-  5: "rotateX(-90deg)",
-};
-// cube rotation [x, y] that brings each face to the front
-const FACE_ROT = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
+
+// hand-drawn bunny: viewBox 100x115, the number sits on a badge held at its belly
+function bunnySVG(skin) {
+  // skin 0: white + pink bow · skin 1: peach, one ear flopped out · skin 2: lavender + flower
+  const earR = skin === 1 ? 34 : 12;
+  const accessory = [
+    `<g><path d="M30 47 L19 41 L19 53 Z" fill="#ff6fa0"/><path d="M30 47 L41 41 L41 53 Z" fill="#ff6fa0"/><circle cx="30" cy="47" r="3.4" fill="#ff3f82"/></g>`,
+    "",
+    `<g stroke="#ff9db5" stroke-width=".6" fill="#ffd6e4"><circle cx="74" cy="44" r="3.4"/><circle cx="71.2" cy="47.8" r="3.4"/><circle cx="66.8" cy="46.4" r="3.4"/><circle cx="66.8" cy="41.6" r="3.4"/><circle cx="71.2" cy="40.2" r="3.4"/><circle cx="70" cy="44" r="2.4" fill="#ffd166" stroke="none"/></g>`,
+  ][skin];
+
+  return `<svg class="bunny v${skin}" viewBox="0 0 100 115" aria-hidden="true">
+    <g transform="rotate(-12 32 48)"><g class="ear ear-l">
+      <ellipse class="fur" cx="32" cy="26" rx="11" ry="25"/><ellipse class="ear-in" cx="32" cy="29" rx="5.5" ry="16"/>
+    </g></g>
+    <g transform="rotate(${earR} 68 48)"><g class="ear ear-r">
+      <ellipse class="fur" cx="68" cy="26" rx="11" ry="25"/><ellipse class="ear-in" cx="68" cy="29" rx="5.5" ry="16"/>
+    </g></g>
+    <ellipse class="fur" cx="32" cy="105" rx="13" ry="7.5"/><ellipse class="pad" cx="32" cy="107.5" rx="5" ry="3"/>
+    <ellipse class="fur" cx="68" cy="105" rx="13" ry="7.5"/><ellipse class="pad" cx="68" cy="107.5" rx="5" ry="3"/>
+    <ellipse class="fur" cx="50" cy="70" rx="38" ry="34"/>
+    <ellipse class="shade" cx="50" cy="94" rx="30" ry="10"/>
+    <ellipse cx="50" cy="46" rx="10" ry="3.5" fill="#fff" opacity=".6"/>
+    ${accessory}
+    <ellipse cx="23" cy="72" rx="6.5" ry="4" fill="#ff9db5" opacity=".55"/>
+    <ellipse cx="77" cy="72" rx="6.5" ry="4" fill="#ff9db5" opacity=".55"/>
+    <g class="eyes-open blink" fill="#3b2a3f">
+      <ellipse cx="35" cy="62" rx="4.8" ry="6.2"/><ellipse cx="65" cy="62" rx="4.8" ry="6.2"/>
+      <circle cx="33.4" cy="59.6" r="1.9" fill="#fff"/><circle cx="63.4" cy="59.6" r="1.9" fill="#fff"/>
+      <circle cx="36.8" cy="64.2" r=".9" fill="#fff"/><circle cx="66.8" cy="64.2" r=".9" fill="#fff"/>
+    </g>
+    <g class="eyes-happy" fill="none" stroke="#3b2a3f" stroke-width="2.6" stroke-linecap="round">
+      <path d="M30.5 63 Q35 56 39.5 63"/><path d="M60.5 63 Q65 56 69.5 63"/>
+    </g>
+    <ellipse cx="50" cy="68" rx="3.2" ry="2.3" fill="#ff7fa1"/>
+    <g class="mouth-closed" fill="none" stroke="#c0728b" stroke-width="1.8" stroke-linecap="round">
+      <path d="M50 70.3 L50 73"/><path d="M50 73 Q45.5 78.5 41.5 74"/><path d="M50 73 Q54.5 78.5 58.5 74"/>
+    </g>
+    <g class="mouth-open">
+      <path d="M43 72 Q50 72 57 72 Q55 80 50 80 Q45 80 43 72 Z" fill="#c9506f"/>
+      <ellipse cx="50" cy="77.6" rx="3.2" ry="1.7" fill="#ff8fa8"/>
+    </g>
+    <g class="badge">
+      <circle cx="50" cy="93" r="13" fill="#ffb340" stroke="#fff" stroke-width="2.4"/>
+      <text class="num" x="50" y="93" dy=".35em" text-anchor="middle" font-size="17" font-weight="900"
+        font-family="'PingFang TC','Noto Sans TC',-apple-system,sans-serif"
+        fill="#fff" stroke="#d9700a" stroke-width=".9" style="paint-order:stroke">?</text>
+    </g>
+    <circle class="fur" cx="36.5" cy="99" r="5.6"/><circle class="fur" cx="63.5" cy="99" r="5.6"/>
+  </svg>`;
+}
 
 const dice = [];
-
-function cubeTransform([x, y, z = 0]) {
-  return `rotateX(${x}deg) rotateY(${y}deg) rotateZ(${z}deg)`;
-}
 
 function buildDice() {
   for (let i = 0; i < DICE_COUNT; i++) {
     const slot = document.createElement("div");
-    slot.className = "die-slot";
-    const faces = Object.keys(FACE_TRANSFORM)
-      .map((n) => {
-        const pips = PIPS[n].map((p) => `<i style="grid-area:p${p}"></i>`).join("");
-        return `<div class="die-face face-${n}" style="--face:${FACE_TRANSFORM[n]}">${pips}</div>`;
-      })
-      .join("");
+    slot.className = "bunny-slot";
     slot.innerHTML = `
-      <div class="die-shadow"></div>
-      <div class="die-hop">
-        <div class="die-view">
-          <div class="die-cube">
-            <div class="die-core cx"></div><div class="die-core cy"></div><div class="die-core cz"></div>
-            ${faces}
-          </div>
-        </div>
-      </div>`;
+      <div class="bunny-shadow"></div>
+      <div class="bunny-hop"><div class="bunny-spin">${bunnySVG(i % 3)}</div></div>`;
     diceTrayEl.appendChild(slot);
     const die = {
-      hop: slot.querySelector(".die-hop"),
-      view: slot.querySelector(".die-view"),
-      cube: slot.querySelector(".die-cube"),
-      shadow: slot.querySelector(".die-shadow"),
-      rot: FACE_ROT[1 + Math.floor(Math.random() * 6)].slice(),
+      slot,
+      hop: slot.querySelector(".bunny-hop"),
+      spin: slot.querySelector(".bunny-spin"),
+      shadow: slot.querySelector(".bunny-shadow"),
+      num: slot.querySelector(".num"),
+      badge: slot.querySelector(".badge"),
+      tilt: -6 + Math.random() * 12,
     };
-    die.cube.style.transform = cubeTransform(die.rot);
-    die.view.style.setProperty("--yaw", `${-20 + Math.random() * 40}deg`);
+    die.spin.style.transform = `rotate(${die.tilt}deg)`;
     dice.push(die);
   }
 }
@@ -654,22 +668,25 @@ function rollOneDie(die, value, index) {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const duration = reduceMotion ? 450 : 1250 + Math.random() * 250;
   const delayMs = reduceMotion ? 0 : index * 90 + Math.random() * 60;
-  const amp = 0.85 + Math.random() * 0.35; // jump height, in die sizes
+  const amp = 0.85 + Math.random() * 0.35; // jump height, in bunny sizes
 
-  const [fx, fy] = FACE_ROT[value];
-  const from = [die.rot[0], die.rot[1], 0];
-  // extra whole turns on every axis so it tumbles, but still lands on `value`
-  const to = [fx + randSpin(2, 3), fy + randSpin(2, 3), randSpin(1, 2)];
+  // somersault in the air, still landing upright (a whole number of turns + a fresh little tilt)
+  const from = die.tilt;
+  const nextTilt = -6 + Math.random() * 12;
+  const to = nextTilt + randSpin(1, 2);
 
-  die.view.style.setProperty("--yaw", `${-22 + Math.random() * 44}deg`);
+  die.slot.classList.add("is-rolling");
+  const flicker = setInterval(() => {
+    die.num.textContent = 1 + Math.floor(Math.random() * 6);
+  }, 85);
 
-  const spin = die.cube.animate(
-    [{ transform: cubeTransform(from) }, { transform: cubeTransform(to) }],
+  const spin = die.spin.animate(
+    [{ transform: `rotate(${from}deg)` }, { transform: `rotate(${to}deg)` }],
     { duration: duration * 0.9, delay: delayMs, easing: "cubic-bezier(.12,.62,.25,1)", fill: "both" }
   );
 
   // bounces: jump → land → smaller hop → land → tiny hop → settle
-  const H = (k) => `translateY(calc(var(--die) * ${-amp * k}))`;
+  const H = (k) => `translateY(calc(var(--bunny) * ${-amp * k}))`;
   const up = "cubic-bezier(.2,.7,.4,1)";
   const down = "cubic-bezier(.6,0,.8,.4)";
   const hop = die.hop.animate(
@@ -707,10 +724,16 @@ function rollOneDie(die, value, index) {
   // if the page isn't rendering (background tab), animations stay pending — don't hang the game
   const done = Promise.all([spin.finished, hop.finished]).catch(() => {});
   return Promise.race([done, delay(delayMs + duration + 400)]).then(() => {
-    die.rot = [fx, fy];
-    die.cube.style.transform = cubeTransform(die.rot);
+    clearInterval(flicker);
+    die.tilt = nextTilt;
+    die.spin.style.transform = `rotate(${die.tilt}deg)`;
     spin.cancel();
     hop.cancel();
+    die.num.textContent = value;
+    die.slot.classList.remove("is-rolling");
+    die.badge.classList.remove("pop");
+    void die.badge.getBoundingClientRect();
+    die.badge.classList.add("pop");
   });
 }
 

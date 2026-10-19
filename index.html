@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>寒修行大富翁</title>
+<title>寒修行世界ＧＯ</title>
 <!-- link preview (LINE / FB / etc.): title only, no description text -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="寒修行大富翁">
+<meta property="og:title" content="寒修行世界ＧＯ">
 <meta property="og:description" content="&#8203;">
 <meta name="description" content="&#8203;">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
 </button>
 
 <header class="page-head">
-  <h1><span class="grad-text">寒修行大富翁</span></h1>
+  <h1><span class="grad-text">寒修行世界ＧＯ</span></h1>
   <p class="subtitle">擲出骰子，走向未知，收下一句屬於你的真如苑歌</p>
 </header>
 
@@ -53,8 +53,22 @@
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-card" id="modalCard">
+    <div class="modal-place">
+      <svg class="modal-plane" viewBox="0 0 72 40" aria-hidden="true">
+        <g class="plane-trail" stroke="#bfeaff" stroke-width="2.4" stroke-linecap="round" fill="none">
+          <path d="M2 13 H12"/><path d="M0 21 H10"/><path d="M3 29 H13"/>
+        </g>
+        <g class="plane-body">
+          <path d="M22 17 L15 4 H26 L34 16 Z" fill="#35e0ff"/>
+          <path d="M20 20 C20 15 26 13 36 13 H58 C66 13 70 17 70 20 C70 23 66 27 58 27 H36 C26 27 20 25 20 20 Z" fill="#fff"/>
+          <path d="M38 25 L52 25 L42 38 H33 Z" fill="#a899ff"/>
+          <path d="M62 15.2 Q68 16.5 69 20 H62 Z" fill="#35e0ff"/>
+          <circle cx="44" cy="20" r="2.2" fill="#35e0ff"/><circle cx="51" cy="20" r="2.2" fill="#35e0ff"/><circle cx="57.5" cy="20" r="2.2" fill="#35e0ff"/>
+        </g>
+      </svg>
+      <span class="modal-place-name" id="modalPlace"></span>
+    </div>
     <div class="modal-icon" id="modalIcon">✨</div>
-    <div class="modal-type" id="modalType">人生小語</div>
     <h2 class="modal-name" id="modalName">格子名稱</h2>
     <div class="modal-num" id="modalNum"></div>
     <p class="modal-quote" id="modalQuote">這裡會顯示一句話。</p>
@@ -64,6 +78,6 @@
 
 <div class="confetti-layer" id="confettiLayer"></div>
 
-<script src="script.js?v=27"></script>
+<script src="script.js?v=31"></script>
 </body>
 </html>
