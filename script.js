@@ -147,6 +147,7 @@ const centerPanel = document.getElementById("centerPanel");
 const tokenEl = document.getElementById("token");
 const diceTrayEl = document.getElementById("diceTray");
 const diceTotalEl = document.getElementById("diceTotal");
+const hintStepsEl = document.getElementById("hintSteps");
 const rollBtn = document.getElementById("rollBtn");
 const toastEl = document.getElementById("toast");
 const modalOverlay = document.getElementById("modalOverlay");
@@ -740,9 +741,12 @@ function rollOneDie(die, value, index) {
 async function rollDiceAnimation(values) {
   diceTotalEl.classList.remove("show");
   diceTotalEl.textContent = "…";
+  hintStepsEl.textContent = "？";
   SFX.tick();
   await Promise.all(dice.map((die, i) => rollOneDie(die, values[i], i)));
-  diceTotalEl.textContent = `${values.join(" + ")} = ${values.reduce((a, b) => a + b, 0)}`;
+  const total = values.reduce((a, b) => a + b, 0);
+  diceTotalEl.textContent = `${values.join(" + ")} = ${total}`;
+  hintStepsEl.textContent = total;
   void diceTotalEl.offsetWidth;
   diceTotalEl.classList.add("show");
 }
