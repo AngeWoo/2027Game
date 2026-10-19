@@ -542,7 +542,9 @@ body {
   padding: clamp(28px, 6vw, 48px) clamp(20px, 5vw, 44px) clamp(24px, 5vw, 40px);
   border-radius: 28px;
   text-align: center;
-  background: linear-gradient(165deg, rgba(35,25,70,0.95), rgba(15,12,35,0.95));
+  background:
+    url("modal-people.webp?v=3") center bottom / 100% auto no-repeat,
+    linear-gradient(165deg, rgba(35,25,70,0.95), rgba(15,12,35,0.95));
   border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(124,92,255,0.25);
   transform: scale(0.7) translateY(30px);
@@ -654,6 +656,7 @@ body {
   color: var(--text);
   margin: 0 0 clamp(24px, 5vw, 36px);
   text-wrap: balance;
+  text-shadow: 0 1px 10px rgba(15, 12, 35, 0.95), 0 0 3px rgba(15, 12, 35, 0.8);
 }
 .modal-num {
   font-size: clamp(18px, 4.4vw, 24px);
