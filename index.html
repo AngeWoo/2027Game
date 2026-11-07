@@ -10,7 +10,8 @@
 <meta property="og:description" content="&#8203;">
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
-<link rel="stylesheet" href="style.css?v=51">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=52">
 </head>
 <body>
 
@@ -58,7 +59,7 @@
 <div class="toast" id="toast"></div>
 
 <div class="modal-overlay" id="modalOverlay">
-  <div class="modal-card" id="modalCard">
+  <div class="modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalName" tabindex="-1">
     <div class="modal-place">
       <svg class="modal-plane" viewBox="0 0 72 40" aria-hidden="true">
         <g class="plane-trail" stroke="#e9a35c" stroke-width="2.4" stroke-linecap="round" fill="none">
@@ -108,11 +109,11 @@
 
 <!-- 寒修行與教義檢定：今日實踐視窗按「繼續前進」後跳出的小視窗 -->
 <div class="quiz-overlay" id="quizOverlay">
-  <div class="quiz-card" id="quizCard" role="dialog" aria-modal="true" aria-labelledby="quizQ">
+  <div class="quiz-card" id="quizCard" role="dialog" aria-modal="true" aria-labelledby="quizQ" tabindex="-1">
     <button class="quiz-x" id="quizX" aria-label="關閉">×</button>
     <div class="quiz-head">
       <span class="quiz-tag">寒修行與教義檢定</span>
-      <span class="quiz-no" id="quizNo"></span>
+      <span class="quiz-no" id="quizNo" aria-live="polite"></span>
     </div>
     <p class="quiz-q" id="quizQ"></p>
     <div class="quiz-options" id="quizOptions"></div>
@@ -127,6 +128,6 @@
 <div class="confetti-layer" id="confettiLayer"></div>
 
 <script src="quiz.js?v=2"></script>
-<script src="script.js?v=52"></script>
+<script src="script.js?v=54"></script>
 </body>
 </html>

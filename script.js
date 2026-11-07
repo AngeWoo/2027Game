@@ -173,6 +173,7 @@ const modalQuote = document.getElementById("modalQuote");
 const modalNum = document.getElementById("modalNum");
 const modalClose = document.getElementById("modalClose");
 const quizOverlay = document.getElementById("quizOverlay");
+const quizCard = document.getElementById("quizCard");
 const quizNo = document.getElementById("quizNo");
 const quizQ = document.getElementById("quizQ");
 const quizOptions = document.getElementById("quizOptions");
@@ -292,6 +293,7 @@ const BOARD_MAX_WIDE = 2.0; //  width  ≤ 2.0 × height
 const BOARD_MAX_TALL = 2.0; //  height ≤ 2.0 × width
 const TILE_PASS_GROW = 10; // px added while the token passes a tile
 const TILE_LAND_GROW = 7; //  px added to the tile the token lands on
+let lastFitKey = "";
 function fitBoard() {
   if (!stageEl || !boardWrapEl) return;
   const cs = getComputedStyle(stageEl);
@@ -301,6 +303,10 @@ function fitBoard() {
   let h = Math.max(220, stageEl.clientHeight - padY);
   w = Math.min(w, h * BOARD_MAX_WIDE);
   h = Math.min(h, w * BOARD_MAX_TALL);
+  // 尺寸跟上次一樣就不必再量一輪字級（那是最貴的部分，約 16ms）
+  const fitKey = `${Math.floor(w)}x${Math.floor(h)}`;
+  if (fitKey === lastFitKey) return;
+  lastFitKey = fitKey;
   boardWrapEl.style.width = `${Math.floor(w)}px`;
   boardWrapEl.style.height = `${Math.floor(h)}px`;
 
@@ -510,7 +516,7 @@ const WT = {
 };
 
 async function loadCsv(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-cache" }); // 每次都向伺服器確認有沒有更新
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const rows = (await res.text())
     .split("\n")
@@ -569,6 +575,56 @@ function pickFrom(pool) {
   return pool.rows[i];
 }
 
+// ---------- 彈窗的焦點管理 ----------
+// 開啟：背景設成 inert（不能 Tab、不能點、讀螢幕軟體也略過），焦點移進視窗，雪花暫停。
+// 關閉：把這一切還原，焦點回到擲骰按鈕。
+const BG_SELECTORS = ".page-head, .stage, #soundToggle, .admin-dot";
+
+function setBackgroundInert(on) {
+  document.querySelectorAll(BG_SELECTORS).forEach((el) => {
+    if (on) el.setAttribute("inert", "");
+    else el.removeAttribute("inert");
+  });
+}
+
+function dialogOpened(card, focusEl) {
+  setBackgroundInert(true);
+  if (snowCtl) snowCtl.pause();
+  (focusEl || card).focus({ preventScroll: true }); // 視窗只是透明度 0，不是 display:none，可以直接收焦點
+}
+
+function dialogsClosed() {
+  setBackgroundInert(false);
+  if (snowCtl) snowCtl.resume();
+}
+
+function focusablesIn(root) {
+  return [
+    ...root.querySelectorAll('button:not([disabled]):not([hidden]), [href], input:not([disabled])'),
+  ].filter((el) => el.offsetParent !== null);
+}
+
+// 視窗開著時，Tab 只在視窗裡面繞圈
+function trapTab(e, card) {
+  if (e.key !== "Tab") return;
+  const list = focusablesIn(card);
+  if (!list.length) {
+    e.preventDefault();
+    card.focus();
+    return;
+  }
+  const first = list[0];
+  const last = list[list.length - 1];
+  const at = document.activeElement;
+  if (e.shiftKey && (at === first || at === card)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && at === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 // ---------- modal ----------
 const LAND_SOUND = {
   start: () => SFX.landStart(),
@@ -587,6 +643,7 @@ function openModal(tile) {
   modalQuote.textContent = q.text || tile.quote;
   quizAfterModal = true; // 每一格關閉後都出一題檢定（機會／命運也含在內）
   modalOverlay.classList.add("show");
+  dialogOpened(modalCard, modalClose);
   (LAND_SOUND[tile.type] || LAND_SOUND.regular)();
   if (LAND_FX[tile.type] && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     LAND_FX[tile.type]();
@@ -610,6 +667,8 @@ function closeModal() {
 function endTurn() {
   busy = false;
   rollBtn.disabled = false;
+  dialogsClosed();
+  rollBtn.focus({ preventScroll: true }); // 鍵盤使用者按 Enter 就能直接再擲
 }
 
 modalClose.addEventListener("click", closeModal);
@@ -762,15 +821,17 @@ function pickQuiz() {
   return { item: QUIZ_POOL.rows[i], index: i };
 }
 
+let quizServed = 0; // 這次開啟頁面已經出了幾題
 function openQuiz() {
   const picked = pickQuiz();
   if (!picked) {
     endTurn();
     return;
   }
-  const { item, index } = picked;
+  const { item } = picked;
 
-  quizNo.textContent = `第 ${index + 1} 題 / 共 ${QUIZ_POOL.rows.length} 題`;
+  quizServed += 1;
+  quizNo.textContent = `本次第 ${quizServed} 題`;
   quizQ.textContent = item.q;
   quizResult.hidden = true;
   quizVerdict.className = "quiz-verdict";
@@ -788,6 +849,7 @@ function openQuiz() {
   });
 
   quizOverlay.classList.add("show");
+  dialogOpened(quizCard, quizOptions.querySelector(".quiz-opt"));
 }
 
 function gradeQuiz(item, chosen) {
@@ -807,6 +869,7 @@ function gradeQuiz(item, chosen) {
   quizExplain.textContent = item.explain || "";
   quizResult.hidden = false;
   quizClose.hidden = false;
+  quizClose.focus({ preventScroll: true }); // 答完直接 Enter 就能關
   bumpCounter(right ? "qaRight" : "qaWrong");
 
   if (right) {
@@ -825,8 +888,19 @@ function closeQuiz() {
 
 quizClose.addEventListener("click", closeQuiz);
 quizX.addEventListener("click", closeQuiz);
+quizOverlay.addEventListener("click", (e) => {
+  if (e.target === quizOverlay) closeQuiz(); // 和今日實踐視窗一樣：點背景就關
+});
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && quizOverlay.classList.contains("show")) closeQuiz();
+  const quizOpen = quizOverlay.classList.contains("show");
+  const modalOpen = modalOverlay.classList.contains("show");
+  if (e.key === "Escape") {
+    if (quizOpen) closeQuiz();
+    else if (modalOpen) closeModal();
+    return;
+  }
+  if (quizOpen) trapTab(e, quizCard);
+  else if (modalOpen) trapTab(e, modalCard);
 });
 
 // ---------- sound toggle ----------
@@ -1176,6 +1250,7 @@ function handleResize() {
 }
 
 // ---------- background snowfall ----------
+let snowCtl = null; // startSnow 會填入 { pause, resume }
 function startSnow() {
   const canvas = document.getElementById("snow");
   if (!canvas) return;
@@ -1236,13 +1311,26 @@ function startSnow() {
       else if (f.x > w + 5) f.x = -5;
     }
     draw();
-    requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
   }
+
+  let rafId = 0;
+  snowCtl = {
+    pause() {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    },
+    resume() {
+      if (reduceMotion || rafId) return;
+      last = performance.now();
+      rafId = requestAnimationFrame(tick);
+    },
+  };
 
   resize();
   window.addEventListener("resize", resize);
   if (reduceMotion) draw();
-  else requestAnimationFrame(tick);
+  else rafId = requestAnimationFrame(tick);
 }
 
 function init() {
@@ -1262,6 +1350,14 @@ function init() {
     fitBoard();
     moveTokenTo(position, false);
   });
+  // 字型載入完文字寬度會變，要重新量一次
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      lastFitKey = "";
+      fitBoard();
+      moveTokenTo(position, false);
+    });
+  }
 }
 
 init();

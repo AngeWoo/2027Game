@@ -874,6 +874,19 @@ body {
   .hint { display: none; }
 }
 
+/* ---------- 鍵盤焦點外框（只在用鍵盤時出現）---------- */
+.roll-btn:focus-visible,
+.sound-toggle:focus-visible,
+.modal-close:focus-visible,
+.quiz-opt:focus-visible,
+.quiz-close:focus-visible,
+.quiz-x:focus-visible {
+  outline: 3px solid var(--accent-1);
+  outline-offset: 3px;
+}
+.modal-card:focus,
+.quiz-card:focus { outline: none; }
+
 /* ---------- 寒修行與教義檢定小視窗 ---------- */
 .quiz-overlay {
   position: fixed;
