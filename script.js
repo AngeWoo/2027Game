@@ -133,6 +133,17 @@ const SFX = (() => {
         tone({ freq: f, duration: 0.26, type: "sine", volume: 0.2, delay: i * 0.08 })
       );
     },
+    // 答對：明亮上行三音
+    quizRight() {
+      [659.25, 880, 1174.66].forEach((f, i) =>
+        tone({ freq: f, duration: 0.2, type: "sine", volume: 0.2, delay: i * 0.07 })
+      );
+    },
+    // 答錯：柔和下行兩音（不刺耳）
+    quizWrong() {
+      tone({ freq: 330, freqEnd: 247, duration: 0.3, type: "triangle", volume: 0.18 });
+      tone({ freq: 165, duration: 0.34, type: "sine", volume: 0.12, delay: 0.06 });
+    },
   };
 })();
 
@@ -158,6 +169,15 @@ const modalName = document.getElementById("modalName");
 const modalQuote = document.getElementById("modalQuote");
 const modalNum = document.getElementById("modalNum");
 const modalClose = document.getElementById("modalClose");
+const quizOverlay = document.getElementById("quizOverlay");
+const quizNo = document.getElementById("quizNo");
+const quizQ = document.getElementById("quizQ");
+const quizOptions = document.getElementById("quizOptions");
+const quizResult = document.getElementById("quizResult");
+const quizVerdict = document.getElementById("quizVerdict");
+const quizExplain = document.getElementById("quizExplain");
+const quizClose = document.getElementById("quizClose");
+const quizX = document.getElementById("quizX");
 const confettiLayer = document.getElementById("confettiLayer");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
@@ -196,8 +216,8 @@ const SYMBOLS = [
     "#f5a800",
     `<path fill="#f5a800" d="M60 12 A40 40 0 1 0 88 66 A32 32 0 0 1 60 12 Z"/>`
   ),
-  svgIcon("#3034a8", `<polygon fill="#3034a8" points="${starPoints(50, 53, 46, 19)}"/>`),
-  svgIcon("#1f8a42", `<polygon fill="#1f8a42" points="${starPoints(50, 53, 46, 19)}"/>`),
+  svgIcon("#c7547a", `<polygon fill="#c7547a" points="${starPoints(50, 53, 46, 19)}"/>`),
+  svgIcon("#87a033", `<polygon fill="#87a033" points="${starPoints(50, 53, 46, 19)}"/>`),
 ];
 
 // deal the 4 symbols evenly (5 each for 20 tiles), shuffled on every page load
@@ -381,7 +401,7 @@ function addPiece(className, style) {
 
 // 機會: golden fireworks burst from the centre — pieces shoot out, then fall under gravity
 function spawnChanceBurst() {
-  const colors = ["#ffd166", "#ff9f43", "#ffe8a3", "#ffb627", "#fff6d5"];
+  const colors = ["#e2791f", "#d1544a", "#f0a52e", "#b45309", "#e8b230"];
   const cx = window.innerWidth / 2;
   const cy = window.innerHeight * 0.42;
   const reach = Math.min(window.innerWidth, window.innerHeight) * 0.55;
@@ -413,10 +433,10 @@ function spawnChanceBurst() {
 // 命運: mysterious petals drifting slowly down from the top, swaying and turning
 function spawnFatePetals() {
   const colors = [
-    "linear-gradient(135deg, #ff8fc4, #c04aa0)",
-    "linear-gradient(135deg, #c9a4ff, #6a3fd6)",
-    "linear-gradient(135deg, #8fb8ff, #3b4fc9)",
-    "linear-gradient(135deg, #ffc2e0, #ff5c8a)",
+    "linear-gradient(135deg, #ffb48f, #d9663f)",
+    "linear-gradient(135deg, #ffd79a, #e09a3c)",
+    "linear-gradient(135deg, #f7a79c, #c75a52)",
+    "linear-gradient(135deg, #ffcfae, #e2855a)",
   ];
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -448,16 +468,28 @@ const LAND_FX = { chance: spawnChanceBurst, fate: spawnFatePetals };
 
 // ---------- quotes ----------
 // Each pool: live Google Sheet first; if blocked/offline, the local snapshot; then a built-in list.
-// 苑歌 pool — same sheet as Train17/index2; used by the regular tiles.
+// 今日實踐 pool — used by the regular tiles.
 const YUANGE = {
-  sheet:
-    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSJvh4hp9JZWYOKyACPM-TDXKe-4aMTNQfqNxbBloYlZjsZJ_2wSVSjL88TS340Bf7CeBqVwIXCM3KA/pub?gid=0&single=true&output=csv",
+  // 今日實踐句（不再讀取舊的苑歌月曆 Google Sheet）
+  sheet: null,
   local: "quotes.csv",
   rows: [
-    "01 具備充滿自己特性的美德", "02 勿忘身為真如教徒", "03 溫柔且堅強", "04 不以自我為中心",
-    "05 莫讓他人難過", "06 批評別人之前先反省自己", "07 不在背後道人長短", "08 勿堅持己見",
-    "09 設身處地為他人著想", "10 身心清淨", "11 經常微笑待人", "12 成為令人珍惜的人",
-    "13 為人誠實", "14 不引起爭執", "15 謙恭穩重", "16 尊重他人", "17 不說不必要的話",
+    "禮讓行人",
+    "面帶笑容 耐心傾聽",
+    "說好語 給予正面回應",
+    "表達感謝 謙虛待人",
+    "主動打招呼 表達關懷",
+    "垃圾分類做資源回收",
+    "為戰事與受災者祈福",
+    "為別人祈福",
+    "站在對方立場設想",
+    "溫柔說好 謝謝 對不起",
+    "與他人分享我會的事",
+    "善用資源 不浪費",
+    "尊重他人",
+    "喜悅之事 樂於分享",
+    "大方讚美他人",
+    "讓他人感到愉悅和放鬆 營造和諧",
   ],
   last: -1,
 };
@@ -486,7 +518,7 @@ async function loadCsv(url) {
 }
 
 async function fetchPool(pool) {
-  for (const url of [pool.sheet, pool.local]) {
+  for (const url of [pool.sheet, pool.local].filter(Boolean)) {
     try {
       pool.rows = await loadCsv(url);
       return;
@@ -547,9 +579,10 @@ function openModal(tile) {
   const q = isLuck ? parseWt(pickFrom(WT)) : parseYuange(pickFrom(YUANGE));
   modalIcon.innerHTML = tile.icon;
   modalPlace.textContent = tile.name;
-  modalName.textContent = q.source || tile.name;
+  modalName.textContent = q.source || (isLuck ? tile.name : "今日實踐");
   modalNum.textContent = q.num ? `《${q.num}》` : "";
   modalQuote.textContent = q.text || tile.quote;
+  quizAfterModal = true; // 每一格關閉後都出一題檢定（機會／命運也含在內）
   modalOverlay.classList.add("show");
   (LAND_SOUND[tile.type] || LAND_SOUND.regular)();
   if (LAND_FX[tile.type] && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -557,9 +590,21 @@ function openModal(tile) {
   }
 }
 
+// 任何一格的視窗關閉後，都接一題檢定小視窗
+let quizAfterModal = false;
+
 function closeModal() {
   modalOverlay.classList.remove("show");
   SFX.click();
+  if (quizAfterModal) {
+    quizAfterModal = false;
+    setTimeout(openQuiz, 220);
+    return;
+  }
+  endTurn();
+}
+
+function endTurn() {
   busy = false;
   rollBtn.disabled = false;
 }
@@ -567,6 +612,89 @@ function closeModal() {
 modalClose.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", (e) => {
   if (e.target === modalOverlay) closeModal();
+});
+
+// ---------- 寒修行與教義檢定小視窗 ----------
+// quiz.js 以 const 宣告，不會掛在 window 上，所以用 typeof 判斷
+const QUIZ_POOL = {
+  rows: typeof QUIZ !== "undefined" && Array.isArray(QUIZ) ? QUIZ : [],
+  last: -1,
+};
+const OPT_KEYS = ["A", "B", "C", "D", "E", "F"];
+
+function pickQuiz() {
+  const n = QUIZ_POOL.rows.length;
+  if (!n) return null;
+  let i = Math.floor(Math.random() * n);
+  if (n > 1 && i === QUIZ_POOL.last) i = (i + 1) % n;
+  QUIZ_POOL.last = i;
+  return { item: QUIZ_POOL.rows[i], index: i };
+}
+
+function openQuiz() {
+  const picked = pickQuiz();
+  if (!picked) {
+    endTurn();
+    return;
+  }
+  const { item, index } = picked;
+
+  quizNo.textContent = `第 ${index + 1} 題 / 共 ${QUIZ_POOL.rows.length} 題`;
+  quizQ.textContent = item.q;
+  quizResult.hidden = true;
+  quizVerdict.className = "quiz-verdict";
+  quizClose.hidden = true;
+  quizOptions.innerHTML = "";
+
+  item.options.forEach((text, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "quiz-opt";
+    btn.innerHTML = `<span class="opt-key">${OPT_KEYS[i] || i + 1}</span><span class="opt-text"></span>`;
+    btn.querySelector(".opt-text").textContent = text;
+    btn.addEventListener("click", () => gradeQuiz(item, i), { once: true });
+    quizOptions.appendChild(btn);
+  });
+
+  quizOverlay.classList.add("show");
+}
+
+function gradeQuiz(item, chosen) {
+  const right = chosen === item.answer;
+  const btns = [...quizOptions.querySelectorAll(".quiz-opt")];
+  btns.forEach((b, i) => {
+    b.disabled = true;
+    if (i === item.answer) b.classList.add("is-right");
+    else if (i === chosen) b.classList.add("is-wrong");
+    else b.classList.add("dimmed");
+  });
+
+  quizVerdict.className = `quiz-verdict ${right ? "right" : "wrong"}`;
+  quizVerdict.textContent = right
+    ? "✓ 答對了！"
+    : `✗ 答錯了，正解是 ${OPT_KEYS[item.answer]}`;
+  quizExplain.textContent = item.explain || "";
+  quizResult.hidden = false;
+  quizClose.hidden = false;
+
+  if (right) {
+    SFX.quizRight();
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) spawnChanceBurst();
+  } else {
+    SFX.quizWrong();
+  }
+}
+
+function closeQuiz() {
+  quizOverlay.classList.remove("show");
+  SFX.click();
+  endTurn();
+}
+
+quizClose.addEventListener("click", closeQuiz);
+quizX.addEventListener("click", closeQuiz);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && quizOverlay.classList.contains("show")) closeQuiz();
 });
 
 // ---------- sound toggle ----------
@@ -590,9 +718,9 @@ function sheepSVG(skin) {
   // skin 0: cream + pink bow · skin 1: toffee, one ear tipped out · skin 2: lavender + flower
   const earR = skin === 1 ? 22 : 6;
   const accessory = [
-    `<g><path d="M30 44 L19 38 L19 50 Z" fill="#ff6fa0"/><path d="M30 44 L41 38 L41 50 Z" fill="#ff6fa0"/><circle cx="30" cy="44" r="3.4" fill="#ff3f82"/></g>`,
+    `<g><path d="M30 44 L19 38 L19 50 Z" fill="#f4796a"/><path d="M30 44 L41 38 L41 50 Z" fill="#f4796a"/><circle cx="30" cy="44" r="3.4" fill="#df5347"/></g>`,
     "",
-    `<g stroke="#ff9db5" stroke-width=".6" fill="#ffd6e4"><circle cx="74" cy="41" r="3.4"/><circle cx="71.2" cy="44.8" r="3.4"/><circle cx="66.8" cy="43.4" r="3.4"/><circle cx="66.8" cy="38.6" r="3.4"/><circle cx="71.2" cy="37.2" r="3.4"/><circle cx="70" cy="41" r="2.4" fill="#ffd166" stroke="none"/></g>`,
+    `<g stroke="#e8a184" stroke-width=".6" fill="#ffe0c9"><circle cx="74" cy="41" r="3.4"/><circle cx="71.2" cy="44.8" r="3.4"/><circle cx="66.8" cy="43.4" r="3.4"/><circle cx="66.8" cy="38.6" r="3.4"/><circle cx="71.2" cy="37.2" r="3.4"/><circle cx="70" cy="41" r="2.4" fill="#ffd166" stroke="none"/></g>`,
   ][skin];
 
   // the wool is a cluster of puffs, drawn twice: once fat for the outline,
@@ -632,31 +760,31 @@ function sheepSVG(skin) {
       <path d="M64 50 Q73 46 73.5 53.5 Q74 60 67 59.5"/>
     </g>
     <ellipse class="face" cx="50" cy="63" rx="20" ry="17.5"/>
-    <ellipse cx="50" cy="51" rx="8" ry="2.6" fill="#fff" opacity=".5"/>
+    <ellipse cx="50" cy="51" rx="8" ry="2.6" fill="#fff8ef" opacity=".5"/>
     ${accessory}
-    <ellipse cx="33" cy="70" rx="5.2" ry="3.2" fill="#ff9db5" opacity=".5"/>
-    <ellipse cx="67" cy="70" rx="5.2" ry="3.2" fill="#ff9db5" opacity=".5"/>
-    <g class="eyes-open blink" fill="#3b2a3f">
+    <ellipse cx="33" cy="70" rx="5.2" ry="3.2" fill="#ffae92" opacity=".5"/>
+    <ellipse cx="67" cy="70" rx="5.2" ry="3.2" fill="#ffae92" opacity=".5"/>
+    <g class="eyes-open blink" fill="#4a2e22">
       <ellipse cx="41" cy="61" rx="4.4" ry="5.8"/><ellipse cx="59" cy="61" rx="4.4" ry="5.8"/>
       <circle cx="39.6" cy="58.8" r="1.8" fill="#fff"/><circle cx="57.6" cy="58.8" r="1.8" fill="#fff"/>
       <circle cx="42.6" cy="63.2" r=".9" fill="#fff"/><circle cx="60.6" cy="63.2" r=".9" fill="#fff"/>
     </g>
-    <g class="eyes-happy" fill="none" stroke="#3b2a3f" stroke-width="2.6" stroke-linecap="round">
+    <g class="eyes-happy" fill="none" stroke="#4a2e22" stroke-width="2.6" stroke-linecap="round">
       <path d="M36.5 62 Q41 55 45.5 62"/><path d="M54.5 62 Q59 55 63.5 62"/>
     </g>
-    <ellipse cx="50" cy="70" rx="3.4" ry="2.4" fill="#ff7fa1"/>
-    <g class="mouth-closed" fill="none" stroke="#c0728b" stroke-width="1.8" stroke-linecap="round">
+    <ellipse cx="50" cy="70" rx="3.4" ry="2.4" fill="#ef8a74"/>
+    <g class="mouth-closed" fill="none" stroke="#bf7a62" stroke-width="1.8" stroke-linecap="round">
       <path d="M50 72.4 L50 74.6"/><path d="M50 74.6 Q46 79.5 42.5 75.5"/><path d="M50 74.6 Q54 79.5 57.5 75.5"/>
     </g>
     <g class="mouth-open">
-      <path d="M44 73 Q50 73 56 73 Q54.5 80.5 50 80.5 Q45.5 80.5 44 73 Z" fill="#c9506f"/>
-      <ellipse cx="50" cy="78.4" rx="3" ry="1.6" fill="#ff8fa8"/>
+      <path d="M44 73 Q50 73 56 73 Q54.5 80.5 50 80.5 Q45.5 80.5 44 73 Z" fill="#c4564a"/>
+      <ellipse cx="50" cy="78.4" rx="3" ry="1.6" fill="#ffa48d"/>
     </g>
     <g class="badge">
-      <circle cx="50" cy="93" r="13" fill="#ffb340" stroke="#fff" stroke-width="2.4"/>
+      <circle cx="50" cy="93" r="13" fill="#ffb340" stroke="#fff6e8" stroke-width="2.4"/>
       <text class="num" x="50" y="93" dy=".35em" text-anchor="middle" font-size="17" font-weight="900"
         font-family="'PingFang TC','Noto Sans TC',-apple-system,sans-serif"
-        fill="#fff" stroke="#d9700a" stroke-width=".9" style="paint-order:stroke">?</text>
+        fill="#fff6e8" stroke="#c75f08" stroke-width=".9" style="paint-order:stroke">?</text>
     </g>
   </svg>`;
 }
@@ -868,7 +996,7 @@ function startSnow() {
 
   function draw() {
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#ffffff";
     for (const f of flakes) {
       ctx.globalAlpha = f.alpha;
       ctx.beginPath();
