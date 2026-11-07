@@ -10,7 +10,7 @@
 <meta property="og:description" content="&#8203;">
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
-<link rel="stylesheet" href="style.css?v=48">
+<link rel="stylesheet" href="style.css?v=51">
 </head>
 <body>
 
@@ -25,6 +25,9 @@
 <button id="soundToggle" class="sound-toggle" aria-label="切換音效" title="切換音效">
   <span id="soundIcon">🔊</span>
 </button>
+
+<!-- 題庫管理入口：左上角幾乎看不見的小點，碰到才會浮出來 -->
+<a class="admin-dot" href="qa-admin.html" title="題庫管理" aria-label="題庫管理">⚙</a>
 
 <header class="page-head">
   <h1><span class="grad-text">寒修行世界ＧＯ</span></h1>
@@ -43,6 +46,8 @@
             <span>立即體驗</span>
           </button>
           <p class="hint">喜羊羊寒修行前進，<span id="hintSteps">？</span>步</p>
+          <p class="hint hint-world">寒修行真如苑跨出世界 <span id="worldSteps" aria-live="polite">？</span> 步</p>
+          <p class="hint hint-qa">Q&amp;A 正確答題 <span id="qaRight" class="qa-right">？</span> 題，錯誤答題 <span id="qaWrong" class="qa-wrong">？</span> 題</p>
         </div>
       </div>
       <div class="token" id="token">🚀</div>
@@ -122,6 +127,6 @@
 <div class="confetti-layer" id="confettiLayer"></div>
 
 <script src="quiz.js?v=2"></script>
-<script src="script.js?v=48"></script>
+<script src="script.js?v=52"></script>
 </body>
 </html>

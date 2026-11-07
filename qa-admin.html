@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>題庫檢查 — 寒修行世界ＧＯ</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#fff3e4">
+<link rel="stylesheet" href="qa-admin.css?v=4">
+</head>
+<body>
+
+<!-- 密碼鎖：解開前不顯示任何東西 -->
+<div class="lock" id="lock">
+  <form class="lock-card" id="lockForm" autocomplete="off">
+    <div class="lock-icon" aria-hidden="true">🔒</div>
+    <h1>題庫檢查</h1>
+    <p class="lock-sub">請輸入管理密碼</p>
+    <input type="password" id="lockInput" placeholder="密碼" aria-label="管理密碼" autocomplete="current-password">
+    <p class="lock-error" id="lockError" hidden>密碼不對，請再試一次。</p>
+    <button class="btn btn-primary" type="submit">進入</button>
+    <a class="lock-back" href="index.html">← 回遊戲</a>
+  </form>
+</div>
+
+<header class="admin-head" id="adminHead" hidden>
+  <div class="admin-head-inner">
+    <div>
+      <h1>題庫檢查</h1>
+      <p class="sub">寒修行與教義檢定 · <span id="countLabel">讀取中…</span></p>
+    </div>
+    <div class="head-actions">
+      <a class="btn btn-ghost" href="index.html">回遊戲</a>
+      <a class="btn btn-primary" id="sheetBtn" target="_blank" rel="noopener">開啟試算表編輯</a>
+    </div>
+  </div>
+</header>
+
+<main class="admin-main" id="adminMain" hidden>
+
+  <section class="bar">
+    <button class="btn" id="reloadBtn">重新讀取</button>
+    <button class="btn" id="downloadBtn">下載 quiz.json 備份</button>
+  </section>
+
+  <section class="linkbar">
+    <span class="link-state" id="linkState">資料來源：讀取中…</span>
+  </section>
+
+  <div class="verdict" id="verdict" hidden></div>
+
+  <p class="note">
+    <strong>題目要新增、修改、刪除，都在 Google 試算表裡做</strong> —— 按右上角「開啟試算表編輯」。
+    一列一題，欄位是<code>題目</code>、<code>選項A</code>～<code>選項D</code>、<code>正解</code>（填 A/B/C/D）、<code>解說</code>。
+    想多一個選項就多開一欄 <code>選項E</code>，想刪一題就把整列刪掉。
+    存檔後回到這頁按「重新讀取」確認格式沒問題，遊戲那邊重新整理就會換成新題庫。
+  </p>
+
+  <div id="list" class="list"></div>
+
+  <p class="empty" id="emptyHint" hidden>讀不到任何題目。</p>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+
+<template id="cardTpl">
+  <article class="card ro">
+    <div class="card-head">
+      <span class="card-no"></span>
+      <span class="card-flag"></span>
+    </div>
+    <p class="card-q"></p>
+    <ol class="ro-options"></ol>
+    <p class="card-explain"></p>
+  </article>
+</template>
+
+<script src="qa-admin.js?v=4"></script>
+</body>
+</html>

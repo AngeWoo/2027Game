@@ -159,6 +159,9 @@ const tokenEl = document.getElementById("token");
 const diceTrayEl = document.getElementById("diceTray");
 const diceTotalEl = document.getElementById("diceTotal");
 const hintStepsEl = document.getElementById("hintSteps");
+const worldStepsEl = document.getElementById("worldSteps");
+const qaRightEl = document.getElementById("qaRight");
+const qaWrongEl = document.getElementById("qaWrong");
 const rollBtn = document.getElementById("rollBtn");
 const toastEl = document.getElementById("toast");
 const modalOverlay = document.getElementById("modalOverlay");
@@ -615,12 +618,140 @@ modalOverlay.addEventListener("click", (e) => {
 });
 
 // ---------- 寒修行與教義檢定小視窗 ----------
-// quiz.js 以 const 宣告，不會掛在 window 上，所以用 typeof 判斷
+// 題庫來源，依序嘗試：
+//   1. Google 試算表（發布為 CSV）— 平常就在那裡新增／修改／刪除題目
+//   2. quiz.json          — 同資料夾的快照，試算表讀不到時頂著
+//   3. quiz.js 內建的 QUIZ — 最後的保險
+// quiz.js 以 const 宣告，不會掛在 window 上，所以用 typeof 判斷。
+const QUIZ_BANK = {
+  sheet:
+    "https://docs.google.com/spreadsheets/d/10XOptiWlH3KWV1nI9bP9odEpemr1dndmH8Lc0cjUMwo/gviz/tq?tqx=out:csv&gid=0",
+  local: "quiz.json",
+};
+
 const QUIZ_POOL = {
   rows: typeof QUIZ !== "undefined" && Array.isArray(QUIZ) ? QUIZ : [],
   last: -1,
+  from: "內建",
 };
+
 const OPT_KEYS = ["A", "B", "C", "D", "E", "F"];
+
+function isValidQuizItem(q) {
+  return (
+    q &&
+    typeof q.q === "string" &&
+    q.q.trim() &&
+    Array.isArray(q.options) &&
+    q.options.length >= 2 &&
+    q.options.every((o) => typeof o === "string" && o.trim()) &&
+    Number.isInteger(q.answer) &&
+    q.answer >= 0 &&
+    q.answer < q.options.length
+  );
+}
+
+// 正規的 CSV 解析：處理引號包起來的欄位、欄位裡的逗號／換行／雙引號
+function parseCsvTable(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      quoted = true;
+    } else if (c === ",") {
+      row.push(field);
+      field = "";
+    } else if (c === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (c !== "\r") {
+      field += c;
+    }
+  }
+  if (field !== "" || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+// 試算表欄位：題目 | 選項A…選項F | 正解 | 解說（靠標題列對應，欄位順序可以換）
+function quizFromCsv(text) {
+  const table = parseCsvTable(text).filter((r) => r.some((c) => c && c.trim()));
+  if (table.length < 2) throw new Error("試算表沒有資料");
+  const head = table[0].map((h) => (h || "").trim());
+  const qi = head.indexOf("題目");
+  const ai = head.indexOf("正解");
+  const ei = head.indexOf("解說");
+  if (qi < 0 || ai < 0) throw new Error("標題列要有「題目」和「正解」");
+  const optCols = OPT_KEYS.map((k) => head.indexOf("選項" + k));
+
+  const out = [];
+  for (const r of table.slice(1)) {
+    const q = (r[qi] || "").trim();
+    if (!q) continue;
+    const want = (r[ai] || "").trim().toUpperCase();
+    const options = [];
+    let answer = -1;
+    optCols.forEach((ci, n) => {
+      if (ci < 0) return;
+      const v = (r[ci] || "").trim();
+      if (!v) return;
+      if (OPT_KEYS[n] === want) answer = options.length;
+      options.push(v);
+    });
+    const item = { q, options, answer, explain: ei >= 0 ? (r[ei] || "").trim() : "" };
+    if (isValidQuizItem(item)) out.push(item);
+  }
+  if (!out.length) throw new Error("沒有讀到有效題目");
+  return out;
+}
+
+async function loadQuizBank() {
+  const sources = [
+    { url: QUIZ_BANK.sheet, kind: "csv", name: "Google 試算表" },
+    { url: QUIZ_BANK.local, kind: "json", name: "quiz.json" },
+  ].filter((s) => s.url);
+
+  for (const src of sources) {
+    try {
+      const sep = src.url.includes("?") ? "&" : "?";
+      const res = await fetch(src.url + sep + "t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const text = await res.text();
+      const rows =
+        src.kind === "csv"
+          ? quizFromCsv(text)
+          : (JSON.parse(text) || []).filter(isValidQuizItem);
+      if (rows.length) {
+        QUIZ_POOL.rows = rows;
+        QUIZ_POOL.last = -1;
+        QUIZ_POOL.from = src.name;
+        return;
+      }
+      throw new Error("沒有有效題目");
+    } catch (e) {
+      console.warn(`題庫 ${src.name} 讀取失敗：`, e.message || e);
+    }
+  }
+  console.warn("改用 quiz.js 內建題庫");
+}
 
 function pickQuiz() {
   const n = QUIZ_POOL.rows.length;
@@ -676,6 +807,7 @@ function gradeQuiz(item, chosen) {
   quizExplain.textContent = item.explain || "";
   quizResult.hidden = false;
   quizClose.hidden = false;
+  bumpCounter(right ? "qaRight" : "qaWrong");
 
   if (right) {
     SFX.quizRight();
@@ -923,12 +1055,96 @@ async function walk(steps) {
   return passedStart;
 }
 
+/* ---------- 全球累計統計 ----------
+   所有人（不分裝置、不分瀏覽器）共用同一組數字：
+     steps    每擲一次骰子 +1
+     qa-right Q&A 答對 +1
+     qa-wrong Q&A 答錯 +1
+   走公開的免費計數服務 abacus.jasoncameron.dev，只存數字，不傳任何個資。
+   連不到時就沿用本機快取的數字，不會卡住畫面。                      */
+const COUNTERS = {
+  base: "https://abacus.jasoncameron.dev",
+  ns: "hanxiuxing-2027game",
+  items: {
+    steps: { key: "steps", el: worldStepsEl, value: null },
+    qaRight: { key: "qa-right", el: qaRightEl, value: null },
+    qaWrong: { key: "qa-wrong", el: qaWrongEl, value: null },
+  },
+};
+
+function counterCacheRead(key) {
+  try {
+    const n = Number(localStorage.getItem("hx2027.c." + key));
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  } catch (e) {
+    return null;
+  }
+}
+function counterCacheWrite(key, n) {
+  try {
+    localStorage.setItem("hx2027.c." + key, String(n));
+  } catch (e) {}
+}
+
+function counterRender(name, bump) {
+  const it = COUNTERS.items[name];
+  if (!it || !it.el) return;
+  it.el.textContent = it.value == null ? "？" : it.value.toLocaleString("en-US");
+  if (!bump) return;
+  it.el.classList.remove("bump");
+  void it.el.offsetWidth;
+  it.el.classList.add("bump");
+}
+
+async function counterCall(path, key) {
+  const res = await fetch(`${COUNTERS.base}/${path}/${COUNTERS.ns}/${key}`, {
+    cache: "no-store",
+  });
+  const data = await res.json();
+  if (typeof data.value === "number") return data.value;
+  if (/not found/i.test(data.error || "")) return 0; // 還沒有人計過
+  throw new Error(data.error || "bad response");
+}
+
+function loadCounters() {
+  Object.keys(COUNTERS.items).forEach(async (name) => {
+    const it = COUNTERS.items[name];
+    it.value = counterCacheRead(it.key);
+    counterRender(name, false);
+    try {
+      it.value = await counterCall("get", it.key); // 只讀，不加
+      counterCacheWrite(it.key, it.value);
+      counterRender(name, false);
+    } catch (e) {
+      // 離線或服務暫時不通：沿用本機快取
+    }
+  });
+}
+
+async function bumpCounter(name) {
+  const it = COUNTERS.items[name];
+  if (!it) return;
+  // 先樂觀 +1，畫面馬上有反應
+  if (it.value != null) {
+    it.value += 1;
+    counterRender(name, true);
+  }
+  try {
+    it.value = await counterCall("hit", it.key); // 真正的全球計數
+    counterCacheWrite(it.key, it.value);
+    counterRender(name, false);
+  } catch (e) {
+    // 連不到就先留著本機加上去的數字
+  }
+}
+
 async function handleRoll() {
   if (busy) return;
   busy = true;
   rollBtn.disabled = true;
   SFX.unlock();
   SFX.click();
+  bumpCounter("steps");
 
   const values = Array.from({ length: DICE_COUNT }, () => 1 + Math.floor(Math.random() * 6));
   const roll = values.reduce((a, b) => a + b, 0);
@@ -1035,6 +1251,8 @@ function init() {
   startSnow();
   syncSoundIcon();
   fetchQuotes();
+  loadQuizBank();
+  loadCounters();
   window.addEventListener("resize", handleResize);
   window.addEventListener("orientationchange", handleResize);
   // mobile browser bars showing/hiding change the visible height without a window resize

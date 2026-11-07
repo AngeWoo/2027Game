@@ -126,6 +126,37 @@ body {
   to { background-position: -420px 260px; }
 }
 
+/* ---------- 題庫管理入口（左上角隱密小點）---------- */
+.admin-dot {
+  position: fixed;
+  top: max(6px, env(safe-area-inset-top));
+  left: max(6px, env(safe-area-inset-left));
+  z-index: 30;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-radius: 50%;
+  opacity: 0.1;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.admin-dot:hover,
+.admin-dot:focus-visible {
+  opacity: 0.95;
+  background: rgba(var(--warm-light-rgb), 0.95);
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.22);
+}
+.admin-dot:focus-visible { outline: 2px solid var(--accent-1); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .admin-dot { transition: none; }
+}
+
 /* ---------- header ---------- */
 .page-head {
   position: relative;
@@ -512,6 +543,48 @@ body {
   margin: 0;
   font-size: clamp(9px, 1.4vw, 11px);
   color: var(--text-dim);
+}
+
+/* 全球累計步數 */
+.hint-world {
+  margin-top: 2px;
+  color: var(--accent-1);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.hint-world #worldSteps {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15em;
+  color: var(--accent-2);
+}
+.hint-world #worldSteps.bump {
+  display: inline-block;
+  animation: world-bump 0.45s ease;
+}
+@keyframes world-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hint-world #worldSteps.bump,
+  .hint-qa .bump { animation: none; }
+}
+
+/* Q&A 累計答題數 */
+.hint-qa {
+  margin-top: 1px;
+  font-weight: 600;
+}
+.hint-qa span {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1em;
+}
+.hint-qa .qa-right { color: var(--start); }
+.hint-qa .qa-wrong { color: var(--fate); }
+.hint-qa .bump {
+  display: inline-block;
+  animation: world-bump 0.45s ease;
 }
 
 /* ---------- token ---------- */
