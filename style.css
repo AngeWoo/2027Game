@@ -626,7 +626,7 @@ body {
   font-weight: 700;
   letter-spacing: 1px;
   box-shadow: 0 12px 26px rgba(var(--accent-1-rgb),0.32);
-  z-index: 50;
+  z-index: 60; /* 要比御守／今日實踐小視窗（55）高，存檔提示才看得見 */
   opacity: 0;
   transition: transform 0.35s cubic-bezier(.4,1.6,.4,1), opacity 0.35s ease;
   pointer-events: none;
@@ -1065,4 +1065,239 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .quiz-card, .quiz-result { transition: none; animation: none; }
+}
+
+/* ---------- 全球累計御守張數 ---------- */
+.hint-omamori {
+  margin-top: 1px;
+  font-weight: 700;
+  color: var(--gold);
+}
+.hint-omamori .omamori-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15em;
+  color: var(--accent-2);
+}
+.hint-omamori .bump {
+  display: inline-block;
+  animation: world-bump 0.45s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hint-omamori .bump { animation: none; }
+}
+
+/* ---------- 今日御守小視窗 ---------- */
+.omamori-x:focus-visible,
+.omamori-save:focus-visible,
+.omamori-close:focus-visible {
+  outline: 3px solid var(--accent-1);
+  outline-offset: 3px;
+}
+.omamori-card:focus { outline: none; }
+
+.omamori-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 44, 24, 0.5);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 55;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.omamori-overlay.show { opacity: 1; pointer-events: auto; }
+
+.omamori-card {
+  position: relative;
+  width: min(92vw, 430px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(18px, 4vw, 26px) clamp(16px, 4vw, 26px) clamp(16px, 3.5vw, 22px);
+  border-radius: 26px;
+  background: linear-gradient(170deg, #fffbf4, #ffeedb);
+  border: 1px solid rgba(var(--warm-ink-rgb), 0.2);
+  box-shadow: 0 26px 70px rgba(var(--shadow-rgb), 0.34), 0 0 70px rgba(var(--gold-rgb), 0.14);
+  /* 視窗本身也是由上往下落下來 */
+  transform: translateY(-46px) scale(0.96);
+  opacity: 0;
+  transition: transform 0.55s cubic-bezier(.22,.78,.3,1), opacity 0.4s ease;
+}
+.omamori-overlay.show .omamori-card { transform: translateY(0) scale(1); opacity: 1; }
+
+.omamori-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 253, 248, 0.8);
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.omamori-x:hover { background: #fff; color: var(--text); }
+
+.omamori-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.omamori-tag {
+  font-size: clamp(13px, 3.4vw, 15px);
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+.omamori-no {
+  font-size: clamp(10px, 2.6vw, 12px);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 御守從這個框的上緣慢慢降下來 */
+.omamori-stage {
+  position: relative;
+  width: min(78%, 300px);
+  aspect-ratio: 1199 / 1312;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.omamori-stage::after {
+  /* 落定時背後透出來的一層暖光 */
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--gold-rgb), 0.38), transparent 68%);
+  opacity: 0;
+  transition: opacity 0.9s ease 1s;
+  pointer-events: none;
+}
+.omamori-stage.revealed::after { opacity: 1; }
+
+.omamori-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: clamp(11px, 2.8vw, 13px);
+  transition: opacity 0.35s ease;
+}
+.omamori-stage.revealed .omamori-wait { opacity: 0; }
+.omamori-knot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(var(--gold-rgb), 0.25);
+  border-top-color: var(--gold);
+  animation: omamori-spin 0.9s linear infinite;
+}
+@keyframes omamori-spin { to { transform: rotate(360deg); } }
+
+.omamori-img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform-origin: 50% 0;
+  filter: drop-shadow(0 12px 24px rgba(var(--shadow-rgb), 0.25));
+}
+/* 由上往下：一邊緩緩降落，一邊從上緣逐段顯現 */
+.omamori-stage.revealed .omamori-img {
+  animation:
+    omamori-descend 1.9s cubic-bezier(.2,.7,.25,1) both,
+    omamori-sway 6s 1.9s ease-in-out infinite;
+}
+@keyframes omamori-descend {
+  0% {
+    opacity: 0;
+    transform: translateY(-26%) scale(0.965);
+    clip-path: inset(0 0 100% 0);
+    filter: blur(7px) drop-shadow(0 12px 24px rgba(150, 96, 52, 0));
+  }
+  14% { opacity: 1; }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    clip-path: inset(0 0 0 0);
+    filter: blur(0) drop-shadow(0 12px 24px rgba(150, 96, 52, 0.25));
+  }
+}
+@keyframes omamori-sway {
+  0%, 100% { transform: rotate(-1.1deg); }
+  50%      { transform: rotate(1.1deg); }
+}
+
+.omamori-note {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: clamp(11px, 2.9vw, 13px);
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.omamori-actions {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 下載圖檔：次要按鈕，描邊版 */
+.omamori-save {
+  padding: 10px 20px;
+  border: 1.5px solid rgba(var(--gold-rgb), 0.55);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.75);
+  color: var(--gold);
+  font-size: clamp(12px, 3vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.omamori-save:hover { transform: translateY(-2px); background: #fff; }
+.omamori-save:not([href]) { opacity: 0.45; pointer-events: none; }
+
+.omamori-close {
+  padding: 11px 30px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-3), var(--accent-1));
+  color: #fffaf2;
+  font-size: clamp(13px, 3.2vw, 15px);
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(var(--accent-1-rgb), 0.32);
+  transition: transform 0.18s ease;
+}
+.omamori-close:hover { transform: translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .omamori-card { transition: opacity 0.2s ease; transform: none; }
+  .omamori-overlay.show .omamori-card { transform: none; }
+  .omamori-stage.revealed .omamori-img { animation: none; opacity: 1; }
+  .omamori-knot { animation: none; }
 }

@@ -139,6 +139,14 @@ const SFX = (() => {
         tone({ freq: f, duration: 0.2, type: "sine", volume: 0.2, delay: i * 0.07 })
       );
     },
+    // 御守降下：低沉的鈴聲，再疊上五聲音階的清亮尾音
+    omamori() {
+      tone({ freq: 196, freqEnd: 190, duration: 1.8, type: "sine", volume: 0.2 });
+      tone({ freq: 392, freqEnd: 384, duration: 1.1, type: "triangle", volume: 0.07 });
+      [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((f, i) =>
+        tone({ freq: f, duration: 0.95, type: "sine", volume: 0.11, delay: 0.3 + i * 0.24 })
+      );
+    },
     // 答錯：柔和下行兩音（不刺耳）
     quizWrong() {
       tone({ freq: 330, freqEnd: 247, duration: 0.3, type: "triangle", volume: 0.18 });
@@ -182,6 +190,15 @@ const quizVerdict = document.getElementById("quizVerdict");
 const quizExplain = document.getElementById("quizExplain");
 const quizClose = document.getElementById("quizClose");
 const quizX = document.getElementById("quizX");
+const omamoriOverlay = document.getElementById("omamoriOverlay");
+const omamoriCard = document.getElementById("omamoriCard");
+const omamoriNo = document.getElementById("omamoriNo");
+const omamoriStage = document.getElementById("omamoriStage");
+const omamoriImg = document.getElementById("omamoriImg");
+const omamoriClose = document.getElementById("omamoriClose");
+const omamoriSave = document.getElementById("omamoriSave");
+const omamoriX = document.getElementById("omamoriX");
+const omamoriCountEl = document.getElementById("omamoriCount");
 const confettiLayer = document.getElementById("confettiLayer");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
@@ -641,7 +658,7 @@ function openModal(tile) {
   modalName.textContent = q.source || (isLuck ? tile.name : "今日實踐");
   modalNum.textContent = q.num ? `《${q.num}》` : "";
   modalQuote.textContent = q.text || tile.quote;
-  quizAfterModal = true; // 每一格關閉後都出一題檢定（機會／命運也含在內）
+  afterModal = true; // 每一格關閉後都接一個小視窗（機會／命運也含在內）
   modalOverlay.classList.add("show");
   dialogOpened(modalCard, modalClose);
   (LAND_SOUND[tile.type] || LAND_SOUND.regular)();
@@ -650,16 +667,23 @@ function openModal(tile) {
   }
 }
 
-// 任何一格的視窗關閉後，都接一題檢定小視窗
-let quizAfterModal = false;
+// 任何一格的視窗關閉後都接一個小視窗：
+// index.html 送一張御守；舊的 index - Q&A.html 還是出一題檢定。
+let afterModal = false;
 
 function closeModal() {
   modalOverlay.classList.remove("show");
   SFX.click();
-  if (quizAfterModal) {
-    quizAfterModal = false;
-    setTimeout(openQuiz, 220);
-    return;
+  if (afterModal) {
+    afterModal = false;
+    if (omamoriOverlay) {
+      setTimeout(openOmamori, 260);
+      return;
+    }
+    if (quizOverlay) {
+      setTimeout(openQuiz, 220);
+      return;
+    }
   }
   endTurn();
 }
@@ -886,20 +910,224 @@ function closeQuiz() {
   endTurn();
 }
 
-quizClose.addEventListener("click", closeQuiz);
-quizX.addEventListener("click", closeQuiz);
-quizOverlay.addEventListener("click", (e) => {
-  if (e.target === quizOverlay) closeQuiz(); // 和今日實踐視窗一樣：點背景就關
-});
+if (quizOverlay) {
+  quizClose.addEventListener("click", closeQuiz);
+  quizX.addEventListener("click", closeQuiz);
+  quizOverlay.addEventListener("click", (e) => {
+    if (e.target === quizOverlay) closeQuiz(); // 和今日實踐視窗一樣：點背景就關
+  });
+}
+
+// ---------- 今日御守小視窗 ----------
+// 圖片就放在同資料夾的「御守」底下，一個子資料夾算一組。
+// 之後要增減御守，改這張清單就好，其他地方都不用動。
+const OMAMORI = {
+  dir: "御守",
+  sets: [
+    { folder: "IMG_2845", count: 10 },
+    { folder: "IMG_2850", count: 10 },
+  ],
+};
+
+function omamoriPaths() {
+  const out = [];
+  OMAMORI.sets.forEach((set) => {
+    for (let i = 1; i <= set.count; i++) {
+      const n = String(i).padStart(2, "0");
+      out.push(encodeURI(OMAMORI.dir + "/" + set.folder + "/omamori_" + n + ".png"));
+    }
+  });
+  return out;
+}
+
+// 洗牌袋：整袋抽完才重洗，所以每一張都會輪到，不會一直跳同幾張
+const OMAMORI_POOL = {
+  all: omamoriPaths(),
+  bag: [],
+  last: "",
+};
+
+function refillOmamoriBag() {
+  const bag = OMAMORI_POOL.all.slice();
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bag[i], bag[j]] = [bag[j], bag[i]];
+  }
+  // 新的一輪，第一張別跟上一輪的最後一張撞在一起
+  if (bag.length > 1 && bag[bag.length - 1] === OMAMORI_POOL.last) {
+    [bag[bag.length - 1], bag[0]] = [bag[0], bag[bag.length - 1]];
+  }
+  OMAMORI_POOL.bag = bag;
+}
+
+function drawOmamori() {
+  if (!OMAMORI_POOL.all.length) return "";
+  if (!OMAMORI_POOL.bag.length) refillOmamoriBag();
+  const src = OMAMORI_POOL.bag.pop();
+  OMAMORI_POOL.last = src;
+  return src;
+}
+
+// 圖檔不小，先把下一張偷偷抓回來，下次就是秒出
+function preloadNextOmamori() {
+  if (!OMAMORI_POOL.bag.length) refillOmamoriBag();
+  const next = OMAMORI_POOL.bag[OMAMORI_POOL.bag.length - 1];
+  if (next) new Image().src = next;
+}
+
+// 存到手機／電腦裡時的檔名：用整組御守裡的編號，一看就知道是第幾張
+function omamoriFileName(src) {
+  const i = OMAMORI_POOL.all.indexOf(src);
+  const no = String(i >= 0 ? i + 1 : 0).padStart(2, "0");
+  return `寒修行世界GO_御守_${no}.png`;
+}
+
+// 手機／平板？有 userAgentData 就問它，沒有就看是不是觸控裝置（iOS Safari 走這條）
+function isHandheld() {
+  if (navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean") {
+    return navigator.userAgentData.mobile;
+  }
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+// 網頁不能自己寫進相簿，但手機的分享選單裡就有「儲存影像」，按下去就是存進相簿
+function canSaveToAlbum(file) {
+  return !!file && isHandheld() && !!navigator.canShare && navigator.canShare({ files: [file] });
+}
+
+let omamoriFile = null; // 這張御守的檔案，先備好才能一按就分享
+
+// 先把圖抓成檔案放著。iOS 上如果等到按下去才抓，使用者手勢已經過期，分享會被擋掉。
+async function prepareOmamoriFile(src, name) {
+  try {
+    const res = await fetch(src, { cache: "force-cache" });
+    const blob = await res.blob();
+    if (omamoriSave.download !== name) return; // 中途又抽了下一張，這份就不要了
+    omamoriFile = new File([blob], name, { type: blob.type || "image/png" });
+    if (canSaveToAlbum(omamoriFile)) omamoriSave.textContent = "⤓ 存到相簿";
+  } catch (e) {
+    omamoriFile = null; // 抓不到就退回瀏覽器原本的下載
+  }
+}
+
+// 瀏覽器預設的下載（存到預設下載資料夾）
+function omamoriFallbackDownload() {
+  const a = document.createElement("a");
+  a.href = omamoriSave.href;
+  a.download = omamoriSave.download;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
+async function saveOmamoriAs() {
+  const name = omamoriSave.download || "御守.png";
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: name,
+      types: [{ description: "PNG 圖檔", accept: { "image/png": [".png"] } }],
+    });
+    const blob = omamoriFile || (await (await fetch(omamoriSave.href)).blob());
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    showToast("🧧 御守已存檔");
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // 使用者自己按取消
+    omamoriFallbackDownload();
+  }
+}
+
+if (omamoriSave) {
+  omamoriSave.addEventListener("click", (e) => {
+    // 手機：叫出分享選單，按「儲存影像」就會進相簿
+    if (canSaveToAlbum(omamoriFile)) {
+      e.preventDefault();
+      navigator.share({ files: [omamoriFile], title: "今日御守" }).catch((err) => {
+        if (err && err.name === "AbortError") return; // 使用者自己關掉選單
+        omamoriFallbackDownload();
+      });
+      return;
+    }
+    // 電腦（Chrome／Edge）：自己挑存放目錄
+    if (window.showSaveFilePicker) {
+      e.preventDefault();
+      saveOmamoriAs();
+      return;
+    }
+    // 其他瀏覽器：交給 <a download>，存到預設下載資料夾
+  });
+}
+
+let omamoriServed = 0; // 這次開啟頁面已經領了幾張
+function openOmamori() {
+  const src = drawOmamori();
+  if (!src) {
+    endTurn();
+    return;
+  }
+
+  omamoriServed += 1;
+  omamoriNo.textContent = "本次第 " + omamoriServed + " 張";
+  omamoriStage.classList.remove("revealed"); // 先收起來，等圖到了才由上往下降
+  omamoriImg.removeAttribute("src");
+  omamoriSave.removeAttribute("href"); // 圖還沒到，先不讓人按下載
+  omamoriSave.textContent = "⤓ 下載圖檔";
+  omamoriFile = null;
+  omamoriOverlay.classList.add("show");
+  dialogOpened(omamoriCard, omamoriClose);
+
+  const reveal = () => {
+    if (!omamoriOverlay.classList.contains("show")) return; // 已經被關掉就算了
+    const name = omamoriFileName(src);
+    omamoriImg.src = src;
+    omamoriSave.href = src;
+    omamoriSave.download = name;
+    prepareOmamoriFile(src, name);
+    requestAnimationFrame(() => {
+      omamoriStage.classList.add("revealed");
+      SFX.omamori();
+      bumpCounter("omamori");
+      preloadNextOmamori();
+    });
+  };
+
+  const probe = new Image();
+  probe.decoding = "async";
+  probe.onload = reveal;
+  probe.onerror = reveal; // 載不到也別卡住，讓 alt 文字頂著
+  probe.src = src;
+}
+
+function closeOmamori() {
+  omamoriOverlay.classList.remove("show");
+  omamoriStage.classList.remove("revealed");
+  omamoriFile = null;
+  SFX.click();
+  endTurn();
+}
+
+if (omamoriOverlay) {
+  omamoriClose.addEventListener("click", closeOmamori);
+  omamoriX.addEventListener("click", closeOmamori);
+  omamoriOverlay.addEventListener("click", (e) => {
+    if (e.target === omamoriOverlay) closeOmamori(); // 和今日實踐視窗一樣：點背景就關
+  });
+}
+
 document.addEventListener("keydown", (e) => {
-  const quizOpen = quizOverlay.classList.contains("show");
+  const omamoriOpen = !!omamoriOverlay && omamoriOverlay.classList.contains("show");
+  const quizOpen = !!quizOverlay && quizOverlay.classList.contains("show");
   const modalOpen = modalOverlay.classList.contains("show");
   if (e.key === "Escape") {
-    if (quizOpen) closeQuiz();
+    if (omamoriOpen) closeOmamori();
+    else if (quizOpen) closeQuiz();
     else if (modalOpen) closeModal();
     return;
   }
-  if (quizOpen) trapTab(e, quizCard);
+  if (omamoriOpen) trapTab(e, omamoriCard);
+  else if (quizOpen) trapTab(e, quizCard);
   else if (modalOpen) trapTab(e, modalCard);
 });
 
@@ -1132,8 +1360,9 @@ async function walk(steps) {
 /* ---------- 全球累計統計 ----------
    所有人（不分裝置、不分瀏覽器）共用同一組數字：
      steps    每擲一次骰子 +1
-     qa-right Q&A 答對 +1
-     qa-wrong Q&A 答錯 +1
+     omamori  每領受一張御守 +1
+     qa-right Q&A 答對 +1（只有舊的 index - Q&A.html 會用到）
+     qa-wrong Q&A 答錯 +1（同上）
    走公開的免費計數服務 abacus.jasoncameron.dev，只存數字，不傳任何個資。
    連不到時就沿用本機快取的數字，不會卡住畫面。                      */
 const COUNTERS = {
@@ -1143,6 +1372,7 @@ const COUNTERS = {
     steps: { key: "steps", el: worldStepsEl, value: null },
     qaRight: { key: "qa-right", el: qaRightEl, value: null },
     qaWrong: { key: "qa-wrong", el: qaWrongEl, value: null },
+    omamori: { key: "omamori", el: omamoriCountEl, value: null },
   },
 };
 
@@ -1183,6 +1413,7 @@ async function counterCall(path, key) {
 function loadCounters() {
   Object.keys(COUNTERS.items).forEach(async (name) => {
     const it = COUNTERS.items[name];
+    if (!it.el) return; // 這一版畫面上沒有這個數字，就不用去拿
     it.value = counterCacheRead(it.key);
     counterRender(name, false);
     try {
@@ -1339,7 +1570,8 @@ function init() {
   startSnow();
   syncSoundIcon();
   fetchQuotes();
-  loadQuizBank();
+  if (quizOverlay) loadQuizBank();
+  if (omamoriOverlay) preloadNextOmamori();
   loadCounters();
   window.addEventListener("resize", handleResize);
   window.addEventListener("orientationchange", handleResize);
