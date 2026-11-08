@@ -44,15 +44,61 @@ const SFX = (() => {
     /* localStorage unavailable, keep sound on */
   }
 
+  // iPhone 的 Web Audio 預設跟側邊的「鈴聲／靜音」開關綁在一起：
+  // 撥到靜音就一點聲音都沒有，音量鍵轉到底也沒用。
+  // 把 audioSession 宣告成 playback（Safari 16.4+），才會像看影片一樣不受靜音開關影響。
+  function claimAudioSession() {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = "playback";
+    } catch (e) {
+      /* 舊瀏覽器沒有這個，忽略 */
+    }
+  }
+
   function getCtx() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
+      claimAudioSession();
       ctx = new AC();
     }
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   }
+
+  // iOS 規定要在使用者手勢裡「真的播出」一次聲音，之後排的聲音才放得出來。
+  // 這裡送一個 1 格的無聲 buffer，使用者聽不到，但足以解鎖。
+  let unlocked = false;
+  function unlockNow() {
+    if (!enabled) return; // 使用者自己關掉音效時，不要去搶走他正在聽的音樂
+    claimAudioSession();
+    const c = getCtx();
+    if (!c) return;
+    try {
+      const src = c.createBufferSource();
+      src.buffer = c.createBuffer(1, 1, 22050);
+      src.connect(c.destination);
+      src.start(0);
+    } catch (e) {
+      /* ignore */
+    }
+    if (c.state === "running") unlocked = true;
+  }
+
+  // 不用等到按擲骰：第一次碰到畫面的任何地方就先解鎖
+  function firstTouch() {
+    unlockNow();
+    if (!unlocked) return;
+    document.removeEventListener("pointerdown", firstTouch);
+    document.removeEventListener("touchend", firstTouch);
+  }
+  document.addEventListener("pointerdown", firstTouch, { passive: true });
+  document.addEventListener("touchend", firstTouch, { passive: true });
+
+  // 切去別的 App 再切回來，手機會把音訊停掉，回來要重新叫醒
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && ctx && ctx.state === "suspended") ctx.resume();
+  });
 
   function tone({ freq = 440, duration = 0.12, type = "sine", volume = 0.2, delay = 0, freqEnd = null }) {
     if (!enabled) return;
@@ -76,7 +122,7 @@ const SFX = (() => {
   return {
     isEnabled: () => enabled,
     unlock() {
-      getCtx();
+      unlockNow();
     },
     toggle() {
       enabled = !enabled;
@@ -86,7 +132,7 @@ const SFX = (() => {
         /* ignore */
       }
       if (enabled) {
-        getCtx();
+        unlockNow();
         this.click();
       }
       return enabled;
