@@ -972,7 +972,7 @@ if (quizOverlay) {
 const OMAMORI = {
   dir: "1122",
   // webp 是用同資料夾的原始 png 壓出來的：一樣 1086x1448，但一張只有
-  // 2 百多 KB（原始 png 約 2 MB），顯示和下載都用這一份。
+  // 2 百多 KB（原始 png 約 2 MB），供畫面顯示和明信片合成使用。
   ext: ".webp",
   names: [
     "omamori-red-transparent",
@@ -1061,7 +1061,7 @@ function preloadNextOmamori() {
 function omamoriFileName(src) {
   const i = OMAMORI_POOL.all.indexOf(src);
   const no = String(i >= 0 ? i + 1 : 0).padStart(2, "0");
-  return `寒修行世界GO_御守_${no}${OMAMORI.ext}`;
+  return `真如世界大冒險·GO_御守明信片_${no}.png`;
 }
 
 // 手機／平板？有 userAgentData 就問它，沒有就看是不是觸控裝置（iOS Safari 走這條）
@@ -1077,65 +1077,83 @@ function canSaveToAlbum(file) {
   return !!file && isHandheld() && !!navigator.canShare && navigator.canShare({ files: [file] });
 }
 
-let omamoriFile = null; // 這張御守的檔案，先備好才能一按就分享
+let omamoriFile = null;
 
-// 先把圖抓成檔案放著。iOS 上如果等到按下去才抓，使用者手勢已經過期，分享會被擋掉。
-async function prepareOmamoriFile(src, name) {
+function clearOmamoriDownload() {
+  const url = omamoriSave.getAttribute("href");
+  if (url) URL.revokeObjectURL(url);
+  omamoriSave.removeAttribute("href");
+  omamoriFile = null;
+}
+
+// 先合成圖檔，讓手機可在點擊當下叫出分享選單。
+async function prepareOmamoriFile(image, src, word, drawNumber) {
+  const isCurrentDraw = () => drawNumber === omamoriServed && omamoriOverlay.classList.contains("show");
   try {
-    const res = await fetch(src, { cache: "force-cache" });
-    const blob = await res.blob();
-    if (omamoriSave.download !== name) return; // 中途又抽了下一張，這份就不要了
-    omamoriFile = new File([blob], name, { type: blob.type || "image/webp" });
-    if (canSaveToAlbum(omamoriFile)) omamoriSave.textContent = "⤓ 存到相簿";
-  } catch (e) {
-    omamoriFile = null; // 抓不到就退回瀏覽器原本的下載
+    const note = document.getElementById("omamoriNote").textContent.trim();
+    const blob = await renderOmamoriPostcard(image, word, note);
+    if (!isCurrentDraw()) return;
+    if (!blob) throw new Error("明信片轉檔失敗");
+    const file = new File([blob], omamoriFileName(src), { type: "image/png" });
+    const label = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載圖檔";
+    omamoriSave.href = URL.createObjectURL(file);
+    omamoriSave.download = file.name;
+    omamoriSave.textContent = label;
+    omamoriFile = file;
+  } catch {
+    if (isCurrentDraw()) omamoriSave.textContent = "明信片製作失敗";
   }
 }
 
 // 瀏覽器預設的下載（存到預設下載資料夾）
-function omamoriFallbackDownload() {
+function omamoriFallbackDownload(file) {
+  const url = URL.createObjectURL(file);
   const a = document.createElement("a");
-  a.href = omamoriSave.href;
-  a.download = omamoriSave.download;
+  a.href = url;
+  a.download = file.name;
   document.body.appendChild(a);
   a.click();
   a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
-async function saveOmamoriAs() {
-  const name = omamoriSave.download || "御守" + OMAMORI.ext;
+async function saveOmamoriAs(file) {
   try {
     const handle = await window.showSaveFilePicker({
-      suggestedName: name,
-      types: [{ description: "圖檔", accept: { "image/*": [OMAMORI.ext] } }],
+      suggestedName: file.name,
+      types: [{ description: "PNG 圖檔", accept: { "image/png": [".png"] } }],
     });
-    const blob = omamoriFile || (await (await fetch(omamoriSave.href)).blob());
     const writable = await handle.createWritable();
-    await writable.write(blob);
+    await writable.write(file);
     await writable.close();
-    showToast("🧧 御守已存檔");
+    showToast("🧧 御守明信片已存檔");
   } catch (err) {
     if (err && err.name === "AbortError") return; // 使用者自己按取消
-    omamoriFallbackDownload();
+    omamoriFallbackDownload(file);
   }
 }
 
 if (omamoriSave) {
   omamoriSave.addEventListener("click", (e) => {
-    // 手機：叫出分享選單，按「儲存影像」就會進相簿
-    if (canSaveToAlbum(omamoriFile)) {
+    const file = omamoriFile;
+    if (!file) {
       e.preventDefault();
-      navigator.share({ files: [omamoriFile], title: "今日御守" }).catch((err) => {
+      return;
+    }
+    // 手機：叫出分享選單，按「儲存影像」就會進相簿
+    if (canSaveToAlbum(file)) {
+      e.preventDefault();
+      navigator.share({ files: [file], title: "今日御守明信片" }).catch((err) => {
         if (err && err.name === "AbortError") return; // 使用者自己關掉選單
-        omamoriFallbackDownload();
+        omamoriFallbackDownload(file);
       });
       return;
     }
     // 電腦（Chrome／Edge）：自己挑存放目錄
     if (window.showSaveFilePicker) {
       e.preventDefault();
-      saveOmamoriAs();
+      saveOmamoriAs(file);
       return;
     }
     // 其他瀏覽器：交給 <a download>，存到預設下載資料夾
@@ -1151,6 +1169,7 @@ function openOmamori() {
   }
 
   omamoriServed += 1;
+  const drawNumber = omamoriServed;
   omamoriNo.textContent = "本次第 " + omamoriServed + " 張";
 
   // 法語先放好，等御守落定時再一起亮出來
@@ -1159,24 +1178,25 @@ function openOmamori() {
   if (omamoriWordBy) omamoriWordBy.textContent = word ? word.by : "";
   omamoriStage.classList.remove("revealed"); // 先收起來，等圖到了才由上往下降
   omamoriImg.removeAttribute("src");
-  omamoriSave.removeAttribute("href"); // 圖還沒到，先不讓人按下載
-  omamoriSave.textContent = "⤓ 下載圖檔";
-  omamoriFile = null;
+  clearOmamoriDownload();
+  omamoriSave.textContent = "明信片製作中…";
   omamoriOverlay.classList.add("show");
   dialogOpened(omamoriCard, omamoriClose);
 
   const reveal = () => {
-    if (!omamoriOverlay.classList.contains("show")) return; // 已經被關掉就算了
-    const name = omamoriFileName(src);
+    if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
     omamoriImg.src = src;
-    omamoriSave.href = src;
-    omamoriSave.download = name;
-    prepareOmamoriFile(src, name);
     requestAnimationFrame(() => {
+      if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
       omamoriStage.classList.add("revealed");
       SFX.omamori();
       bumpCounter("omamori");
       preloadNextOmamori();
+      if (probe.naturalWidth) {
+        prepareOmamoriFile(probe, src, word, drawNumber);
+      } else {
+        omamoriSave.textContent = "無法載入御守圖檔";
+      }
     });
   };
 
@@ -1190,7 +1210,7 @@ function openOmamori() {
 function closeOmamori() {
   omamoriOverlay.classList.remove("show");
   omamoriStage.classList.remove("revealed");
-  omamoriFile = null;
+  clearOmamoriDownload();
   SFX.click();
   endTurn();
 }
