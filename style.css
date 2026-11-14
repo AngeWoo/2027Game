@@ -733,11 +733,35 @@ body {
   to { transform: none; opacity: 1; }
 }
 .plane-body path { stroke: rgba(var(--warm-ink-rgb), 0.3); stroke-width: 0.7; }
-.plane-body {
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
-  animation: plane-bob 1.8s ease-in-out infinite;
+
+/* 領頭羊：坐在機身上的小羊（配色跟骰子小羊 v0 一致） */
+.plane-sheep {
+  --ps-fur: #fffaf2;
+  --ps-line: #e9c0ad;
+  --ps-face: #fff1e7;
+  --ps-ear-in: #ffb79b;
 }
+.plane-sheep .ps-wool-edge {
+  fill: var(--ps-line);
+  stroke: var(--ps-line);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.plane-sheep .ps-wool { fill: var(--ps-fur); }
+.plane-sheep .ps-face,
+.plane-sheep .ps-tuft,
+.plane-sheep .ps-ear ellipse {
+  fill: var(--ps-fur);
+  stroke: var(--ps-line);
+  stroke-width: 0.55;
+  stroke-linejoin: round;
+}
+.plane-sheep .ps-face { fill: var(--ps-face); }
+.plane-sheep .ps-ear-in { fill: var(--ps-ear-in); }
+.plane-sheep .ps-cheek { fill: #ffae92; opacity: 0.5; }
+.plane-sheep .ps-eyes { fill: #4a2e22; }
+.plane-sheep .ps-nose { fill: #ef8a74; }
+
 .plane-trail path {
   animation: plane-trail 0.9s linear infinite;
 }
@@ -1119,6 +1143,8 @@ body {
   flex-direction: column;
   align-items: center;
   padding: clamp(18px, 4vw, 26px) clamp(16px, 4vw, 26px) clamp(16px, 3.5vw, 22px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 26px;
   background: linear-gradient(170deg, #fffbf4, #ffeedb);
   border: 1px solid rgba(var(--warm-ink-rgb), 0.2);
@@ -1167,8 +1193,11 @@ body {
 /* 御守從這個框的上緣慢慢降下來 */
 .omamori-stage {
   position: relative;
-  width: min(78%, 300px);
-  aspect-ratio: 1199 / 1312;
+  /* 新御守是直式的，改用高度當基準，視窗再矮也不會把法語擠掉；
+     max-width 是保險，窄機身時寧可縮小也不要頂出卡片 */
+  height: clamp(190px, 38vh, 360px);
+  aspect-ratio: 1086 / 1448;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1212,8 +1241,9 @@ body {
 
 .omamori-img {
   position: relative;
-  width: 100%;
-  height: 100%;
+  /* 留一點邊，左右搖擺時四個角才不會被 stage 切到 */
+  width: 94%;
+  height: 94%;
   object-fit: contain;
   opacity: 0;
   transform-origin: 50% 0;
@@ -1245,12 +1275,69 @@ body {
   50%      { transform: rotate(1.1deg); }
 }
 
+/* 御守底下的法語：分隔線 → 正文 → 署名，三層由重到輕 */
+.omamori-word {
+  width: 100%;
+  margin: clamp(12px, 3vw, 18px) 0 0;
+  opacity: 0;
+  transform: translateY(7px);
+  transition: opacity 0.6s ease 0.95s, transform 0.6s ease 0.95s;
+}
+.omamori-stage.revealed ~ .omamori-word {
+  opacity: 1;
+  transform: none;
+}
+.omamori-word-sep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(var(--gold-rgb), 0.75);
+}
+.omamori-word-sep::before,
+.omamori-word-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--gold-rgb), 0.5));
+}
+.omamori-word-sep::after {
+  background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.5), transparent);
+}
+.omamori-word-text {
+  margin: clamp(9px, 2.4vw, 13px) 0 0;
+  font-size: clamp(13px, 3.3vw, 15px);
+  line-height: 1.95;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-align: justify;
+  text-wrap: pretty;
+  hanging-punctuation: allow-end;
+}
+.omamori-word-text:empty { display: none; }
+.omamori-word-by {
+  margin-top: 7px;
+  text-align: right;
+  font-size: clamp(11px, 2.7vw, 12.5px);
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+.omamori-word-by:empty { display: none; }
+.omamori-word-by::before {
+  content: "\2014\2014\2009";
+  opacity: 0.55;
+  letter-spacing: 0;
+}
+
 .omamori-note {
-  margin: 14px 0 0;
+  margin: clamp(10px, 2.6vw, 14px) 0 0;
   text-align: center;
-  font-size: clamp(11px, 2.9vw, 13px);
+  font-size: clamp(10px, 2.6vw, 11.5px);
   line-height: 1.7;
   color: var(--text-dim);
+  opacity: 0.85;
 }
 
 .omamori-actions {
@@ -1300,4 +1387,5 @@ body {
   .omamori-overlay.show .omamori-card { transform: none; }
   .omamori-stage.revealed .omamori-img { animation: none; opacity: 1; }
   .omamori-knot { animation: none; }
+  .omamori-word { transition: opacity 0.2s ease; transform: none; }
 }

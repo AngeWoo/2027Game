@@ -245,6 +245,8 @@ const omamoriClose = document.getElementById("omamoriClose");
 const omamoriSave = document.getElementById("omamoriSave");
 const omamoriX = document.getElementById("omamoriX");
 const omamoriCountEl = document.getElementById("omamoriCount");
+const omamoriWordText = document.getElementById("omamoriWordText");
+const omamoriWordBy = document.getElementById("omamoriWordBy");
 const confettiLayer = document.getElementById("confettiLayer");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
@@ -965,26 +967,41 @@ if (quizOverlay) {
 }
 
 // ---------- 今日御守小視窗 ----------
-// 圖片就放在同資料夾的「御守」底下，一個子資料夾算一組。
+// 圖片放在同資料夾的 1122 底下，五款顏色各一張。
 // 之後要增減御守，改這張清單就好，其他地方都不用動。
 const OMAMORI = {
-  dir: "御守",
-  sets: [
-    { folder: "IMG_2845", count: 10 },
-    { folder: "IMG_2850", count: 10 },
+  dir: "1122",
+  // webp 是用同資料夾的原始 png 壓出來的：一樣 1086x1448，但一張只有
+  // 2 百多 KB（原始 png 約 2 MB），顯示和下載都用這一份。
+  ext: ".webp",
+  names: [
+    "omamori-red-transparent",
+    "omamori-gold-transparent",
+    "omamori-green-transparent",
+    "omamori-purple-transparent",
+    "omamori-orange-transparent",
   ],
 };
 
 function omamoriPaths() {
-  const out = [];
-  OMAMORI.sets.forEach((set) => {
-    for (let i = 1; i <= set.count; i++) {
-      const n = String(i).padStart(2, "0");
-      out.push(encodeURI(OMAMORI.dir + "/" + set.folder + "/omamori_" + n + ".png"));
-    }
-  });
-  return out;
+  return OMAMORI.names.map((n) => encodeURI(OMAMORI.dir + "/" + n + OMAMORI.ext));
 }
+
+// 舊版二十張御守印在布袋上的法語（重複的已合併）。
+// 現在圖案和法語分開抽：同一款御守每次配到的話都不一樣。
+const OMAMORI_WORDS = [
+  { text: "把自己打扮得漂漂亮亮固然很好，但僅止於此是無法為「美」下定義。透過真誠的話語和行為，每個人都能擁有真正的美麗。", by: "苑主 伊藤真聰 師父" },
+  { text: "開朗、真誠、善良、溫暖，我們每個人都有一些尊貴的特質可為他人付出。", by: "苑主 伊藤真聰 師父" },
+  { text: "開始努力關懷身邊所有一切，就是貢獻的開始。所謂「同心」，就是一如，是相互尊重、協調、凝聚力量。「融合」是「摒除個人主義，溫馨交融」。", by: "苑主 伊藤真聰 師父" },
+  { text: "人生，根據看法或見解的不同，可以顯現出淨土，也可以顯現出穢土。", by: "伊藤真乘 師父" },
+  { text: "心態，是讓自己掉進因緣苦海，或引導自己走向與佛陀共存的歡喜世界之分歧點。", by: "伊藤真乘 師父" },
+  { text: "做讓人家高興的事，看起來好像自己有所損失。但是，佛陀的教法是因為給予他人歡喜，所以自己才會幸福。", by: "教導院/真導院 師父" },
+  { text: "只要向前進，就可以和佛陀的足跡一如，後退的話，則與邪惡一如。要向後退，還是向前進，都靠自己的心。", by: "教導院/真導院 師父" },
+  { text: "要奉修正道，如果只是表面上在做，並且看起來好像很熱心，但是自己的心卻和因緣同在，那是與信仰完全無關的。", by: "教導院/真導院 師父" },
+  { text: "「要知心是行為之根，必常保持內心清淨。」想讓自己得到認同，若主張自我，內心則會混濁，且阻礙自己的道路。", by: "攝受心院 師父" },
+  { text: "只要反省自己是否真的擁有讓對方了解的真誠，即可知道家裡的和平及正法的建立都是在於自己。", by: "攝受心院 師父" },
+  { text: "「燈明是，滅己身給予人們光明」。可是一旦要去做時，卻並非那麼容易。犧牲自己，感謝讓自己成為眾人的基石，就是完全成為燈明。", by: "攝受心院 師父" },
+];
 
 // 洗牌袋：整袋抽完才重洗，所以每一張都會輪到，不會一直跳同幾張
 const OMAMORI_POOL = {
@@ -993,17 +1010,36 @@ const OMAMORI_POOL = {
   last: "",
 };
 
-function refillOmamoriBag() {
-  const bag = OMAMORI_POOL.all.slice();
+// 法語也是同一套洗牌袋，十一句講完才重頭，不會連著兩次抽到同一句
+const OMAMORI_WORD_POOL = {
+  all: OMAMORI_WORDS.slice(),
+  bag: [],
+  last: null,
+};
+
+function shuffleInto(pool) {
+  const bag = pool.all.slice();
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [bag[i], bag[j]] = [bag[j], bag[i]];
   }
-  // 新的一輪，第一張別跟上一輪的最後一張撞在一起
-  if (bag.length > 1 && bag[bag.length - 1] === OMAMORI_POOL.last) {
+  // 新的一輪，第一個別跟上一輪的最後一個撞在一起
+  if (bag.length > 1 && bag[bag.length - 1] === pool.last) {
     [bag[bag.length - 1], bag[0]] = [bag[0], bag[bag.length - 1]];
   }
-  OMAMORI_POOL.bag = bag;
+  pool.bag = bag;
+}
+
+function drawOmamoriWord() {
+  if (!OMAMORI_WORD_POOL.all.length) return null;
+  if (!OMAMORI_WORD_POOL.bag.length) shuffleInto(OMAMORI_WORD_POOL);
+  const word = OMAMORI_WORD_POOL.bag.pop();
+  OMAMORI_WORD_POOL.last = word;
+  return word;
+}
+
+function refillOmamoriBag() {
+  shuffleInto(OMAMORI_POOL);
 }
 
 function drawOmamori() {
@@ -1025,7 +1061,7 @@ function preloadNextOmamori() {
 function omamoriFileName(src) {
   const i = OMAMORI_POOL.all.indexOf(src);
   const no = String(i >= 0 ? i + 1 : 0).padStart(2, "0");
-  return `寒修行世界GO_御守_${no}.png`;
+  return `寒修行世界GO_御守_${no}${OMAMORI.ext}`;
 }
 
 // 手機／平板？有 userAgentData 就問它，沒有就看是不是觸控裝置（iOS Safari 走這條）
@@ -1049,7 +1085,7 @@ async function prepareOmamoriFile(src, name) {
     const res = await fetch(src, { cache: "force-cache" });
     const blob = await res.blob();
     if (omamoriSave.download !== name) return; // 中途又抽了下一張，這份就不要了
-    omamoriFile = new File([blob], name, { type: blob.type || "image/png" });
+    omamoriFile = new File([blob], name, { type: blob.type || "image/webp" });
     if (canSaveToAlbum(omamoriFile)) omamoriSave.textContent = "⤓ 存到相簿";
   } catch (e) {
     omamoriFile = null; // 抓不到就退回瀏覽器原本的下載
@@ -1068,11 +1104,11 @@ function omamoriFallbackDownload() {
 
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
 async function saveOmamoriAs() {
-  const name = omamoriSave.download || "御守.png";
+  const name = omamoriSave.download || "御守" + OMAMORI.ext;
   try {
     const handle = await window.showSaveFilePicker({
       suggestedName: name,
-      types: [{ description: "PNG 圖檔", accept: { "image/png": [".png"] } }],
+      types: [{ description: "圖檔", accept: { "image/*": [OMAMORI.ext] } }],
     });
     const blob = omamoriFile || (await (await fetch(omamoriSave.href)).blob());
     const writable = await handle.createWritable();
@@ -1116,6 +1152,11 @@ function openOmamori() {
 
   omamoriServed += 1;
   omamoriNo.textContent = "本次第 " + omamoriServed + " 張";
+
+  // 法語先放好，等御守落定時再一起亮出來
+  const word = drawOmamoriWord();
+  if (omamoriWordText) omamoriWordText.textContent = word ? word.text : "";
+  if (omamoriWordBy) omamoriWordBy.textContent = word ? word.by : "";
   omamoriStage.classList.remove("revealed"); // 先收起來，等圖到了才由上往下降
   omamoriImg.removeAttribute("src");
   omamoriSave.removeAttribute("href"); // 圖還沒到，先不讓人按下載

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>御守設計稿</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 36px 24px 60px;
+    background:
+      radial-gradient(120% 90% at 50% 0%, #fdfaf4 0%, transparent 60%),
+      #f3ece2;
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    color: #4a3a2a;
+  }
+  h1 { font-size: 17px; letter-spacing: 3px; margin: 0 0 4px; font-weight: 800; }
+  .sub { font-size: 12px; color: #93826e; margin: 0 0 30px; letter-spacing: .5px; }
+  h2 { font-size: 13px; letter-spacing: 2px; margin: 42px 0 16px; color: #8a7760; font-weight: 700; }
+
+  .row { display: flex; gap: 26px; align-items: flex-end; flex-wrap: wrap; }
+  .cell { text-align: center; }
+  .cell figcaption { margin-top: 10px; font-size: 11px; color: #93826e; letter-spacing: 1px; }
+  .cell svg { display: block; filter: drop-shadow(0 10px 14px rgba(90, 60, 40, .22)); }
+
+  .panel {
+    position: relative;
+    width: 272px;
+    aspect-ratio: 340 / 470;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 14px 28px rgba(90, 60, 40, .26);
+  }
+  .panel .deco { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .panel .pouch { position: relative; width: 54%; margin-bottom: 16%; }
+  .panel .pouch svg {
+    width: 100%; height: auto; display: block;
+    filter: drop-shadow(0 8px 14px rgba(40, 20, 10, .3));
+  }
+  .strip svg { border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h1>御守設計稿</h1>
+<p class="sub">依附圖重繪的向量御守，顏色取自原照片</p>
+
+<h2>原始照片（比對用）</h2>
+<img src="_ref.jpg" alt="參考照片" style="max-width:860px;width:100%;border-radius:10px">
+
+<h2>五組顏色</h2>
+<div class="row" id="row5"></div>
+
+<h2>放大檢視</h2>
+<div class="row" id="rowBig"></div>
+
+<h2>盒側星月紋樣（第三張照片）</h2>
+<div class="row" id="rowStrip"></div>
+
+<h2>御守 ＋ 星月紋樣（遊戲視窗用）</h2>
+<div class="row" id="rowPanel"></div>
+
+<h2>加上編繩與流蘇（參考第一張照片）</h2>
+<div class="row" id="rowCord"></div>
+
+<script src="omamori-motifs.js?v=1794652634"></script>
+<script src="omamori-preview.js?v=1794652634"></script>
+</body>
+</html>

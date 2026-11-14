@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="style.css?v=58">
 </head>
 <body>
 
@@ -44,7 +44,7 @@
           <div class="dice-tray" id="diceTray" aria-hidden="true"></div>
           <div class="dice-total" id="diceTotal" aria-live="polite">?</div>
           <button id="rollBtn" class="roll-btn">
-            <span>立即體驗</span>
+            <span>立即出發</span>
           </button>
           <p class="hint">喜羊羊寒修行前進，<span id="hintSteps">？</span>步</p>
           <p class="hint hint-world">寒修行真如苑跨出世界 <span id="worldSteps" aria-live="polite">？</span> 步</p>
@@ -71,6 +71,23 @@
           <path d="M38 25 L52 25 L42 38 H33 Z" fill="#e2705f"/>
           <path d="M62 15.2 Q68 16.5 69 20 H62 Z" fill="#f2a155"/>
           <circle cx="44" cy="20" r="2.2" fill="#f2a155"/><circle cx="51" cy="20" r="2.2" fill="#f2a155"/><circle cx="57.5" cy="20" r="2.2" fill="#f2a155"/>
+          <g class="plane-sheep" transform="translate(51 13) scale(1.6) translate(-48.5 -13)">
+            <g class="ps-wool-edge"><ellipse cx="46" cy="10" rx="5.3" ry="3.3"/><circle cx="42" cy="9" r="2.4"/><circle cx="45.6" cy="7.2" r="2.7"/><circle cx="49.6" cy="8.5" r="2.4"/></g>
+            <g class="ps-wool"><ellipse cx="46" cy="10" rx="5.3" ry="3.3"/><circle cx="42" cy="9" r="2.4"/><circle cx="45.6" cy="7.2" r="2.7"/><circle cx="49.6" cy="8.5" r="2.4"/></g>
+            <g class="ps-ear"><ellipse cx="50" cy="9.5" rx="2.3" ry="1.15" transform="rotate(20 50 9.5)"/></g>
+            <g class="ps-ear"><ellipse cx="56.4" cy="9.5" rx="2.3" ry="1.15" transform="rotate(-20 56.4 9.5)"/></g>
+            <ellipse class="ps-ear-in" cx="50.3" cy="9.6" rx="1.3" ry=".5" transform="rotate(20 50.3 9.6)"/>
+            <ellipse class="ps-ear-in" cx="56.1" cy="9.6" rx="1.3" ry=".5" transform="rotate(-20 56.1 9.6)"/>
+            <ellipse class="ps-face" cx="53.2" cy="9.1" rx="3" ry="2.65"/>
+            <circle class="ps-tuft" cx="53.2" cy="7" r="1.9"/>
+            <ellipse class="ps-cheek" cx="51.2" cy="10.1" rx=".85" ry=".5"/>
+            <ellipse class="ps-cheek" cx="55.2" cy="10.1" rx=".85" ry=".5"/>
+            <g class="ps-eyes">
+              <ellipse cx="51.9" cy="8.9" rx=".66" ry=".87"/><ellipse cx="54.5" cy="8.9" rx=".66" ry=".87"/>
+              <circle cx="51.68" cy="8.57" r=".27" fill="#fff"/><circle cx="54.28" cy="8.57" r=".27" fill="#fff"/>
+            </g>
+            <ellipse class="ps-nose" cx="53.2" cy="10.3" rx=".52" ry=".38"/>
+          </g>
         </g>
       </svg>
       <span class="modal-place-name" id="modalPlace"></span>
@@ -122,6 +139,11 @@
       </div>
       <img class="omamori-img" id="omamoriImg" alt="今日御守" decoding="async">
     </div>
+    <figure class="omamori-word">
+      <span class="omamori-word-sep" aria-hidden="true">&#10070;</span>
+      <blockquote class="omamori-word-text" id="omamoriWordText"></blockquote>
+      <figcaption class="omamori-word-by" id="omamoriWordBy"></figcaption>
+    </figure>
     <p class="omamori-note">願這份守護，伴你把慧燈傳向立教百年。</p>
     <div class="omamori-actions">
       <a class="omamori-save" id="omamoriSave" download>⤓ 下載圖檔</a>
@@ -132,6 +154,6 @@
 
 <div class="confetti-layer" id="confettiLayer"></div>
 
-<script src="script.js?v=58"></script>
+<script src="script.js?v=61"></script>
 </body>
 </html>
