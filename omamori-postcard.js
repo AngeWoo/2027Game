@@ -51,13 +51,18 @@ function renderOmamoriPostcard(image, word, note) {
     ctx.textAlign = "left";
   }
 
+  const footerLeft = 91;
+  const footerTextY = 558;
   ctx.fillStyle = "rgba(77, 123, 143, 0.25)";
-  ctx.fillRect(91, 521, 724, 1);
+  ctx.fillRect(footerLeft, 521, textRight - footerLeft, 1);
   ctx.fillStyle = "#38657a";
+  ctx.font = `13px ${sans}`;
+  ctx.fillText("2027寒修行", footerLeft, 538);
   ctx.font = `bold 17px ${sans}`;
-  ctx.fillText("真如世界大冒險·GO", 91, 552);
+  ctx.fillText("真如世界大冒險·GO", footerLeft, footerTextY);
   ctx.font = `16px ${sans}`;
-  ctx.fillText(note, textX, 552);
+  ctx.textAlign = "right";
+  ctx.fillText(note, textRight, footerTextY);
 
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }
