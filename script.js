@@ -582,7 +582,7 @@ const WT = {
 };
 
 async function loadCsv(url) {
-  const res = await fetch(url, { cache: "no-cache" }); // 每次都向伺服器確認有沒有更新
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const rows = (await res.text())
     .split("\n")
@@ -985,12 +985,12 @@ const OMAMORI = {
 };
 
 function omamoriPaths() {
-  return OMAMORI.names.map((n) => encodeURI(OMAMORI.dir + "/" + n + OMAMORI.ext));
+  return OMAMORI.names.map((name) => encodeURI(OMAMORI.dir + "/" + name + OMAMORI.ext) + "?v=1");
 }
 
 function omamoriBoxPath(src) {
-  const name = src.slice(src.lastIndexOf("/") + 1, -OMAMORI.ext.length);
-  return encodeURI("御守盒/" + name.replace("omamori-", "omamori-box-") + OMAMORI.ext);
+  const file = src.slice(src.lastIndexOf("/") + 1);
+  return encodeURI("御守盒/") + file.replace("omamori-", "omamori-box-");
 }
 
 function loadOmamoriImage(src) {
@@ -1106,7 +1106,7 @@ function setOmamoriDownload(file, date, render) {
   clearOmamoriDownload();
   omamoriSave.href = URL.createObjectURL(file);
   omamoriSave.download = file.name;
-  omamoriSave.textContent = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載圖檔";
+  omamoriSave.textContent = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載明信片圖檔";
   omamoriDownload = { file, date, render };
 }
 

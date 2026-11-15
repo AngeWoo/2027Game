@@ -663,7 +663,7 @@ body {
   border-radius: 28px;
   text-align: center;
   background:
-    url("modal-people.webp?v=3") center bottom / 100% auto no-repeat,
+    url("modal-people.webp?v=4") center bottom / 100% auto no-repeat,
     linear-gradient(165deg, rgba(255,250,242,0.96), rgba(255,228,200,0.97));
   /* 讓底圖人物吃到暖色，不再是冷灰 */
   background-blend-mode: multiply, normal;
