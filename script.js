@@ -989,8 +989,10 @@ function omamoriPaths() {
 }
 
 function omamoriBoxPath(src) {
-  const file = src.slice(src.lastIndexOf("/") + 1);
-  return encodeURI("御守盒/") + file.replace("omamori-", "omamori-box-");
+  const file = src.slice(src.lastIndexOf("/") + 1)
+    .replace("omamori-", "omamori-box-")
+    .replace(/\.webp(?=\?|$)/, ".png");
+  return encodeURI("御守盒/") + file;
 }
 
 function loadOmamoriImage(src) {

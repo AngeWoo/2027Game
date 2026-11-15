@@ -1272,7 +1272,14 @@ body {
     omamori-sway 6s 1.9s ease-in-out infinite;
 }
 .omamori-stage.revealed .omamori-box-img {
-  animation: omamori-descend 1.9s cubic-bezier(.2,.7,.25,1) both;
+  opacity: 1;
+  /* iOS Safari 上避免盒圖同時套用動態裁切和濾鏡。 */
+  animation: omamori-box-descend 1.9s cubic-bezier(.2,.7,.25,1);
+}
+@keyframes omamori-box-descend {
+  0% { opacity: 0; transform: translateY(-26%) scale(0.965); }
+  14% { opacity: 1; }
+  100% { transform: translateY(0) scale(1); }
 }
 @keyframes omamori-descend {
   0% {
