@@ -241,6 +241,7 @@ const omamoriCard = document.getElementById("omamoriCard");
 const omamoriNo = document.getElementById("omamoriNo");
 const omamoriStage = document.getElementById("omamoriStage");
 const omamoriImg = document.getElementById("omamoriImg");
+const omamoriBoxImg = document.getElementById("omamoriBoxImg");
 const omamoriClose = document.getElementById("omamoriClose");
 const omamoriSave = document.getElementById("omamoriSave");
 const omamoriX = document.getElementById("omamoriX");
@@ -987,6 +988,21 @@ function omamoriPaths() {
   return OMAMORI.names.map((n) => encodeURI(OMAMORI.dir + "/" + n + OMAMORI.ext));
 }
 
+function omamoriBoxPath(src) {
+  const name = src.slice(src.lastIndexOf("/") + 1, -OMAMORI.ext.length);
+  return encodeURI("御守盒/" + name.replace("omamori-", "omamori-box-") + OMAMORI.ext);
+}
+
+function loadOmamoriImage(src) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+}
+
 // 舊版二十張御守印在布袋上的法語（重複的已合併）。
 // 現在圖案和法語分開抽：同一款御守每次配到的話都不一樣。
 const OMAMORI_WORDS = [
@@ -1077,32 +1093,54 @@ function canSaveToAlbum(file) {
   return !!file && isHandheld() && !!navigator.canShare && navigator.canShare({ files: [file] });
 }
 
-let omamoriFile = null;
+let omamoriDownload = null;
 
 function clearOmamoriDownload() {
   const url = omamoriSave.getAttribute("href");
   if (url) URL.revokeObjectURL(url);
   omamoriSave.removeAttribute("href");
-  omamoriFile = null;
+  omamoriDownload = null;
+}
+
+function setOmamoriDownload(file, date, render) {
+  clearOmamoriDownload();
+  omamoriSave.href = URL.createObjectURL(file);
+  omamoriSave.download = file.name;
+  omamoriSave.textContent = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載圖檔";
+  omamoriDownload = { file, date, render };
 }
 
 // 先合成圖檔，讓手機可在點擊當下叫出分享選單。
-async function prepareOmamoriFile(image, src, word, drawNumber) {
+async function prepareOmamoriFile(image, box, src, word, drawNumber) {
   const isCurrentDraw = () => drawNumber === omamoriServed && omamoriOverlay.classList.contains("show");
   try {
     const note = document.getElementById("omamoriNote").textContent.trim();
-    const blob = await renderOmamoriPostcard(image, word, note);
+    const date = omamoriPostcardDate();
+    const render = (stampDate) => renderOmamoriPostcard(image, word, note, stampDate, box);
+    const canvas = render(date);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!isCurrentDraw()) return;
     if (!blob) throw new Error("明信片轉檔失敗");
     const file = new File([blob], omamoriFileName(src), { type: "image/png" });
-    const label = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載圖檔";
-    omamoriSave.href = URL.createObjectURL(file);
-    omamoriSave.download = file.name;
-    omamoriSave.textContent = label;
-    omamoriFile = file;
+    setOmamoriDownload(file, date, render);
   } catch {
     if (isCurrentDraw()) omamoriSave.textContent = "明信片製作失敗";
   }
+}
+
+function currentOmamoriFile() {
+  if (!omamoriDownload) return null;
+  const { file, date, render } = omamoriDownload;
+  const today = omamoriPostcardDate();
+  if (date === today) return file;
+
+  // 視窗開著跨日時，同步更新 PNG，保留這次點擊開啟分享或另存選單的權限。
+  const dataUrl = render(today).toDataURL("image/png");
+  const png = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
+  const bytes = Uint8Array.from(png, (byte) => byte.charCodeAt(0));
+  const updatedFile = new File([bytes], file.name, { type: "image/png" });
+  setOmamoriDownload(updatedFile, today, render);
+  return updatedFile;
 }
 
 // 瀏覽器預設的下載（存到預設下載資料夾）
@@ -1136,7 +1174,14 @@ async function saveOmamoriAs(file) {
 
 if (omamoriSave) {
   omamoriSave.addEventListener("click", (e) => {
-    const file = omamoriFile;
+    let file;
+    try {
+      file = currentOmamoriFile();
+    } catch {
+      e.preventDefault();
+      showToast("明信片日期更新失敗，請再試一次");
+      return;
+    }
     if (!file) {
       e.preventDefault();
       return;
@@ -1161,7 +1206,7 @@ if (omamoriSave) {
 }
 
 let omamoriServed = 0; // 這次開啟頁面已經領了幾張
-function openOmamori() {
+async function openOmamori() {
   const src = drawOmamori();
   if (!src) {
     endTurn();
@@ -1176,35 +1221,40 @@ function openOmamori() {
   const word = drawOmamoriWord();
   if (omamoriWordText) omamoriWordText.textContent = word ? word.text : "";
   if (omamoriWordBy) omamoriWordBy.textContent = word ? word.by : "";
-  omamoriStage.classList.remove("revealed"); // 先收起來，等圖到了才由上往下降
+  omamoriStage.classList.remove("revealed", "has-box"); // 先收起來，等圖到了才由上往下降
   omamoriImg.removeAttribute("src");
+  omamoriBoxImg.hidden = true;
+  omamoriBoxImg.removeAttribute("src");
   clearOmamoriDownload();
   omamoriSave.textContent = "明信片製作中…";
   omamoriOverlay.classList.add("show");
   dialogOpened(omamoriCard, omamoriClose);
 
-  const reveal = () => {
-    if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
-    omamoriImg.src = src;
-    requestAnimationFrame(() => {
-      if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
-      omamoriStage.classList.add("revealed");
-      SFX.omamori();
-      bumpCounter("omamori");
-      preloadNextOmamori();
-      if (probe.naturalWidth) {
-        prepareOmamoriFile(probe, src, word, drawNumber);
-      } else {
-        omamoriSave.textContent = "無法載入御守圖檔";
-      }
-    });
-  };
+  const [image, box] = await Promise.all([
+    loadOmamoriImage(src),
+    loadOmamoriImage(omamoriBoxPath(src)),
+  ]);
+  if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
 
-  const probe = new Image();
-  probe.decoding = "async";
-  probe.onload = reveal;
-  probe.onerror = reveal; // 載不到也別卡住，讓 alt 文字頂著
-  probe.src = src;
+  omamoriImg.src = src;
+  if (box) {
+    omamoriBoxImg.src = box.src;
+    omamoriBoxImg.hidden = false;
+    omamoriStage.classList.add("has-box");
+  }
+
+  requestAnimationFrame(() => {
+    if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
+    omamoriStage.classList.add("revealed");
+    SFX.omamori();
+    bumpCounter("omamori");
+    preloadNextOmamori();
+    if (image) {
+      prepareOmamoriFile(image, box, src, word, drawNumber);
+    } else {
+      omamoriSave.textContent = "無法載入御守圖檔";
+    }
+  });
 }
 
 function closeOmamori() {

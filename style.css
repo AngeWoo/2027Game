@@ -1193,11 +1193,9 @@ body {
 /* 御守從這個框的上緣慢慢降下來 */
 .omamori-stage {
   position: relative;
-  /* 新御守是直式的，改用高度當基準，視窗再矮也不會把法語擠掉；
-     max-width 是保險，窄機身時寧可縮小也不要頂出卡片 */
-  height: clamp(190px, 38vh, 360px);
-  aspect-ratio: 1086 / 1448;
-  max-width: 100%;
+  --art-height: clamp(190px, 38vh, 360px);
+  width: 100%;
+  height: var(--art-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1239,21 +1237,42 @@ body {
 }
 @keyframes omamori-spin { to { transform: rotate(360deg); } }
 
-.omamori-img {
+.omamori-pair {
   position: relative;
-  /* 留一點邊，左右搖擺時四個角才不會被 stage 切到 */
-  width: 94%;
-  height: 94%;
-  object-fit: contain;
+  z-index: 1;
+  width: min(100%, calc(var(--art-height) * 1.23));
+  aspect-ratio: 354 / 288;
+}
+.omamori-img,
+.omamori-box-img {
+  position: absolute;
+  height: auto;
   opacity: 0;
   transform-origin: 50% 0;
-  filter: drop-shadow(0 12px 24px rgba(var(--shadow-rgb), 0.25));
+}
+/* 圖檔自帶透明邊，位置按實際可見的御守和盒身對齊。 */
+.omamori-img {
+  z-index: 1;
+  width: 67%;
+  left: -5.2%;
+  top: -6.5%;
+}
+.omamori-box-img {
+  width: 59.6%;
+  left: 44.2%;
+  top: 1%;
+}
+.omamori-stage:not(.has-box) .omamori-img {
+  left: 16.5%;
 }
 /* 由上往下：一邊緩緩降落，一邊從上緣逐段顯現 */
 .omamori-stage.revealed .omamori-img {
   animation:
     omamori-descend 1.9s cubic-bezier(.2,.7,.25,1) both,
     omamori-sway 6s 1.9s ease-in-out infinite;
+}
+.omamori-stage.revealed .omamori-box-img {
+  animation: omamori-descend 1.9s cubic-bezier(.2,.7,.25,1) both;
 }
 @keyframes omamori-descend {
   0% {
@@ -1385,7 +1404,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .omamori-card { transition: opacity 0.2s ease; transform: none; }
   .omamori-overlay.show .omamori-card { transform: none; }
-  .omamori-stage.revealed .omamori-img { animation: none; opacity: 1; }
+  .omamori-stage.revealed .omamori-img,
+  .omamori-stage.revealed .omamori-box-img { animation: none; opacity: 1; }
   .omamori-knot { animation: none; }
   .omamori-word { transition: opacity 0.2s ease; transform: none; }
 }
