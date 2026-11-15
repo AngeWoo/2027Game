@@ -1021,14 +1021,9 @@ const OMAMORI_WORDS = [
   { text: "「燈明是，滅己身給予人們光明」。可是一旦要去做時，卻並非那麼容易。犧牲自己，感謝讓自己成為眾人的基石，就是完全成為燈明。", by: "攝受心院 師父" },
 ];
 
-// 洗牌袋：整袋抽完才重洗，所以每一張都會輪到，不會一直跳同幾張
-const OMAMORI_POOL = {
-  all: omamoriPaths(),
-  bag: [],
-  last: "",
-};
+const OMAMORI_PATHS = omamoriPaths();
 
-// 法語也是同一套洗牌袋，十一句講完才重頭，不會連著兩次抽到同一句
+// 法語用洗牌袋，十一句講完才重頭，不會連著兩次抽到同一句
 const OMAMORI_WORD_POOL = {
   all: OMAMORI_WORDS.slice(),
   bag: [],
@@ -1056,28 +1051,13 @@ function drawOmamoriWord() {
   return word;
 }
 
-function refillOmamoriBag() {
-  shuffleInto(OMAMORI_POOL);
-}
-
 function drawOmamori() {
-  if (!OMAMORI_POOL.all.length) return "";
-  if (!OMAMORI_POOL.bag.length) refillOmamoriBag();
-  const src = OMAMORI_POOL.bag.pop();
-  OMAMORI_POOL.last = src;
-  return src;
-}
-
-// 圖檔不小，先把下一張偷偷抓回來，下次就是秒出
-function preloadNextOmamori() {
-  if (!OMAMORI_POOL.bag.length) refillOmamoriBag();
-  const next = OMAMORI_POOL.bag[OMAMORI_POOL.bag.length - 1];
-  if (next) new Image().src = next;
+  return shuffle(OMAMORI_PATHS)[0] ?? "";
 }
 
 // 存到手機／電腦裡時的檔名：用整組御守裡的編號，一看就知道是第幾張
 function omamoriFileName(src) {
-  const i = OMAMORI_POOL.all.indexOf(src);
+  const i = OMAMORI_PATHS.indexOf(src);
   const no = String(i >= 0 ? i + 1 : 0).padStart(2, "0");
   return `真如世界大冒險·GO_御守明信片_${no}.png`;
 }
@@ -1250,7 +1230,6 @@ async function openOmamori() {
     omamoriStage.classList.add("revealed");
     SFX.omamori();
     bumpCounter("omamori");
-    preloadNextOmamori();
     if (image) {
       prepareOmamoriFile(image, box, src, word, drawNumber);
     } else {
@@ -1730,7 +1709,6 @@ function init() {
   syncSoundIcon();
   fetchQuotes();
   if (quizOverlay) loadQuizBank();
-  if (omamoriOverlay) preloadNextOmamori();
   loadCounters();
   window.addEventListener("resize", handleResize);
   window.addEventListener("orientationchange", handleResize);
