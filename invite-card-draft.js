@@ -47,13 +47,15 @@ function renderInviteCardDraft(opts = {}) {
     qrImage = null, // 真正的 QR code 圖檔（loadInviteQrImage 的結果），沒給就畫占位框
     personalNote = "", // 發送者自己打的話，放在印章上方的空白處
     personalName = "", // 發送者的名字，簽在那句話下面
+    flap = 0, // 仙鶴拍翅膀的動畫進度（一圈＝1），GIF 每一幀給不同的值
+    pixelScale = 2, // 輸出解析度倍率；做 GIF 的每一幀用 1，省時間也省檔案大小
   } = opts;
 
   const canvas = document.createElement("canvas");
-  canvas.width = 1800;
-  canvas.height = 1200;
+  canvas.width = 900 * pixelScale;
+  canvas.height = 600 * pixelScale;
   const ctx = canvas.getContext("2d", { alpha: false });
-  ctx.scale(2, 2);
+  ctx.scale(pixelScale, pixelScale);
 
   const serif = '"Noto Serif TC", "Songti TC", PMingLiU, "Microsoft JhengHei", serif';
   const sans = '"PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
@@ -88,8 +90,9 @@ function renderInviteCardDraft(opts = {}) {
   ctx.fill();
   ctx.restore();
 
-  // ---------- 仙鶴（簡筆，兩隻）----------
-  function crane(cx, cy, scale, alpha) {
+  // ---------- 仙鶴（簡筆，兩隻，翅膀會拍）----------
+  // wingPhase 0→1 是一整圈拍翅：sin 讓翅尖和翅膀頂點一起上下擺，看起來才像飛
+  function crane(cx, cy, scale, alpha, wingPhase) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(scale, scale);
@@ -97,10 +100,13 @@ function renderInviteCardDraft(opts = {}) {
     ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    const lift = Math.sin(wingPhase * Math.PI * 2);
+    const wingY = -18 - lift * 11;
+    const tipY = 6 - lift * 5;
     ctx.beginPath();
-    ctx.moveTo(-40, 6);
-    ctx.quadraticCurveTo(-10, -18, 0, 0);
-    ctx.quadraticCurveTo(10, -18, 40, 4);
+    ctx.moveTo(-40, tipY);
+    ctx.quadraticCurveTo(-10, wingY, 0, 0);
+    ctx.quadraticCurveTo(10, wingY, 40, tipY - 2);
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -114,8 +120,18 @@ function renderInviteCardDraft(opts = {}) {
     ctx.stroke();
     ctx.restore();
   }
-  crane(700, 90, 1, 0.5);
-  crane(760, 130, 0.72, 0.38);
+  // 五隻鶴飛過旭日：位置故意不排整齊、大小忽大忽小、拍翅節奏也錯開，
+  // 看起來才像一群各自飛的鶴，不是同一隻複製貼上的等差排列。
+  const flock = [
+    [612, 48, 0.92, 0.55, 0],
+    [668, 86, 0.58, 0.36, 0.22],
+    [705, 58, 1.02, 0.5, 0.08],
+    [780, 120, 0.48, 0.26, 0.52],
+    [824, 90, 0.74, 0.4, 0.37],
+  ];
+  for (const [cx, cy, scale, alpha, phaseOffset] of flock) {
+    crane(cx, cy, scale, alpha, flap + phaseOffset);
+  }
 
   // ---------- 底部山景色帶：只佔最下面一小段，當資訊列的底紙 ----------
   const bandTop = 478; // 山脊最高點，留出上面大半張卡給標題、邀請詞和時間表
@@ -352,4 +368,32 @@ function renderInviteCardDraft(opts = {}) {
   ctx.textAlign = "left";
 
   return canvas;
+}
+
+/* 把邀請卡做成會動的 GIF（仙鶴拍翅膀）。
+   用 gif.js（vendor 進這個資料夾的 gif.js / gif.worker.js，離線也能跑）在背景執行緒編碼，
+   每一幀都是 renderInviteCardDraft 再畫一次、只有 flap 不一樣，所以預覽動畫和匯出的 GIF
+   長得保證一樣。幀數故意不多、解析度用 1 倍——GIF 本來就不追求銳利，優先顧編碼速度和檔案大小。 */
+function buildInviteGif(opts = {}, { frames = 8, delayMs = 110 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (typeof GIF !== "function") {
+      reject(new Error("gif.js 沒有載入"));
+      return;
+    }
+    const gif = new GIF({
+      workers: 2,
+      quality: 12,
+      width: 900,
+      height: 600,
+      workerScript: "gif.worker.js",
+      repeat: 0, // 不停循環
+    });
+    for (let i = 0; i < frames; i++) {
+      const canvas = renderInviteCardDraft({ ...opts, pixelScale: 1, flap: i / frames });
+      gif.addFrame(canvas, { delay: delayMs, copy: true });
+    }
+    gif.on("finished", (blob) => resolve(blob));
+    gif.on("abort", () => reject(new Error("GIF 製作中斷")));
+    gif.render();
+  });
 }

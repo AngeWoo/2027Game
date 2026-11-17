@@ -1266,9 +1266,11 @@ if (omamoriOverlay) {
 
 // ---------- 發送邀請函：自己打話、簽名字，疊在邀請卡印章上方，分享出去 ----------
 // 不需要密碼——這是給所有玩家用的功能，跟題庫管理（admin-dot）完全不同。
-let inviteAssets = null; // 毛筆字圖＋QR code，只載入一次，之後每次重畫都重複用
-let inviteFile = null; // 目前預覽對應的檔案，給下方分享／下載按鈕用
-let invitePreviewToken = 0; // 每次重畫 +1，讓太舊的非同步結果自己作廢
+// 最後做出來的檔案是會動的 GIF（仙鶴拍翅膀），用 gif.js 在背景執行緒編碼。
+let inviteAssets = null; // 毛筆字圖＋QR code，只載入一次，之後每次重畫、每一幀都重複用
+let inviteFile = null; // 目前準備好的 GIF 檔，給下方分享／下載按鈕用
+let inviteBuildToken = 0; // 每次重做 GIF +1，讓做到一半、已經過時的結果自動作廢
+let inviteAnimTimer = null; // 預覽畫布的動畫（只重畫 canvas，不編碼），開關視窗時連動
 
 async function getInviteAssets() {
   if (!inviteAssets) {
@@ -1280,38 +1282,64 @@ async function getInviteAssets() {
 
 function inviteFileName(name) {
   const who = name.trim();
-  return who ? `寒修行邀請函_${who}.png` : "寒修行邀請函.png";
+  return who ? `寒修行邀請函_${who}.gif` : "寒修行邀請函.gif";
 }
 
-function clearInvitePreview() {
-  invitePreviewToken += 1; // 還在跑的那次 refresh 作廢
+// 預覽畫布只是重畫一次 canvas，很便宜，拿來讓仙鶴在視窗開著時持續拍翅膀；
+// 跟下面真正「做成 GIF」的那份編碼完全分開，不然每一幀都編碼會非常浪費。
+function drawInvitePreviewFrame(flapPhase) {
+  if (!inviteAssets) return;
+  const personalNote = inviteNote.value.trim();
+  const personalName = inviteName.value.trim();
+  const canvas = renderInviteCardDraft({ ...inviteAssets, personalNote, personalName, flap: flapPhase, pixelScale: 1 });
+  const pctx = invitePreview.getContext("2d");
+  pctx.clearRect(0, 0, invitePreview.width, invitePreview.height);
+  pctx.drawImage(canvas, 0, 0, invitePreview.width, invitePreview.height);
+}
+
+let inviteComposing = false; // 注音／拼音選字中：這段時間完全不要重畫，不然會跟輸入法打架
+
+function startInviteAnim() {
+  stopInviteAnim();
+  const t0 = performance.now();
+  inviteAnimTimer = setInterval(() => {
+    if (!inviteOverlay.classList.contains("show") || inviteComposing) return;
+    drawInvitePreviewFrame(((performance.now() - t0) / 1600) % 1); // 一圈 1.6 秒，慢慢拍
+  }, 90);
+}
+
+function stopInviteAnim() {
+  clearInterval(inviteAnimTimer);
+  inviteAnimTimer = null;
+}
+
+function clearInviteFile() {
+  inviteBuildToken += 1; // 還在做的那份 GIF 作廢
   const url = inviteSave.getAttribute("href");
   if (url) URL.revokeObjectURL(url);
   inviteSave.removeAttribute("href");
   inviteFile = null;
 }
 
-async function refreshInvitePreview() {
-  const token = ++invitePreviewToken;
-  const { titleImage, qrImage } = await getInviteAssets();
-  if (token !== invitePreviewToken || !inviteOverlay.classList.contains("show")) return;
+// 正式做 GIF：背景執行完才讓分享／下載按鈕生效，期間按鈕顯示「製作動畫中…」
+async function buildInviteFile() {
+  const token = ++inviteBuildToken;
+  inviteSave.textContent = "製作動畫中…";
+  const assets = await getInviteAssets();
+  if (token !== inviteBuildToken || !inviteOverlay.classList.contains("show")) return;
 
   const personalNote = inviteNote.value.trim();
   const personalName = inviteName.value.trim();
-  const canvas = renderInviteCardDraft({ titleImage, qrImage, personalNote, personalName });
-  const pctx = invitePreview.getContext("2d");
-  pctx.clearRect(0, 0, invitePreview.width, invitePreview.height);
-  pctx.drawImage(canvas, 0, 0, invitePreview.width, invitePreview.height);
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (token !== invitePreviewToken) return;
-  if (!blob) {
-    inviteSave.textContent = "邀請卡製作失敗";
-    inviteSave.removeAttribute("href");
-    inviteFile = null;
+  let blob;
+  try {
+    blob = await buildInviteGif({ ...assets, personalNote, personalName });
+  } catch {
+    if (token === inviteBuildToken) inviteSave.textContent = "邀請卡製作失敗";
     return;
   }
-  const file = new File([blob], inviteFileName(personalName), { type: "image/png" });
+  if (token !== inviteBuildToken) return; // 做的時候使用者又改了輸入，這份已經過時，丟掉
+
+  const file = new File([blob], inviteFileName(personalName), { type: "image/gif" });
   inviteFile = file;
   const oldUrl = inviteSave.getAttribute("href");
   inviteSave.href = URL.createObjectURL(file);
@@ -1330,10 +1358,11 @@ async function refreshInvitePreview() {
   if (oldUrl) URL.revokeObjectURL(oldUrl);
 }
 
-let invitePreviewTimer = null;
-function queueInvitePreview() {
-  clearTimeout(invitePreviewTimer);
-  invitePreviewTimer = setTimeout(refreshInvitePreview, 150);
+let inviteBuildTimer = null;
+function queueInviteBuild() {
+  clearTimeout(inviteBuildTimer);
+  inviteSave.textContent = "製作動畫中…";
+  inviteBuildTimer = setTimeout(buildInviteFile, 500);
 }
 
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
@@ -1341,7 +1370,7 @@ async function saveInviteAs(file) {
   try {
     const handle = await window.showSaveFilePicker({
       suggestedName: file.name,
-      types: [{ description: "PNG 圖檔", accept: { "image/png": [".png"] } }],
+      types: [{ description: "GIF 圖檔", accept: { "image/gif": [".gif"] } }],
     });
     const writable = await handle.createWritable();
     await writable.write(file);
@@ -1355,16 +1384,20 @@ async function saveInviteAs(file) {
 
 function openInvite() {
   SFX.click();
-  inviteSave.textContent = "邀請卡製作中…";
+  inviteSave.textContent = "製作動畫中…";
   inviteOverlay.classList.add("show");
   dialogOpened(inviteCard, inviteNote);
-  refreshInvitePreview();
+  getInviteAssets().then(() => {
+    if (inviteOverlay.classList.contains("show")) startInviteAnim();
+  });
+  queueInviteBuild();
 }
 
 function closeInvite() {
   inviteOverlay.classList.remove("show");
   SFX.click();
-  clearInvitePreview();
+  stopInviteAnim();
+  clearInviteFile();
   dialogsClosed();
   inviteBtn.focus({ preventScroll: true });
 }
@@ -1375,8 +1408,23 @@ if (inviteBtn) {
   inviteOverlay.addEventListener("click", (e) => {
     if (e.target === inviteOverlay) closeInvite(); // 和其他視窗一樣：點背景就關
   });
-  inviteNote.addEventListener("input", queueInvitePreview);
-  inviteName.addEventListener("input", queueInvitePreview);
+  // 中文輸入法選字的時候，瀏覽器會連續送出好幾次 input 事件（還沒選定的候選字）。
+  // 這段期間先不要重畫預覽、也先不要排 GIF 重建，免得跟輸入法搶主執行緒，
+  // 把使用者正在組字、甚至已經選定的字擠掉——等選字結束（compositionend）才真正處理。
+  const handleInviteTextInput = () => {
+    if (inviteComposing) return;
+    queueInviteBuild();
+  };
+  for (const el of [inviteNote, inviteName]) {
+    el.addEventListener("compositionstart", () => {
+      inviteComposing = true;
+    });
+    el.addEventListener("compositionend", () => {
+      inviteComposing = false;
+      queueInviteBuild();
+    });
+    el.addEventListener("input", handleInviteTextInput);
+  }
   inviteSave.addEventListener("click", (e) => {
     const file = inviteFile;
     if (!file) {
