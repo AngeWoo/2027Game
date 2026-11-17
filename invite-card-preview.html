@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>邀請卡草稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Long+Cang&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=Liu+Jian+Mao+Cao&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 60px;
+    background: #efe7d6;
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    color: #4a3a2a;
+  }
+  h1 { font-size: 16px; letter-spacing: 3px; margin: 0 0 4px; font-weight: 800; }
+  h2 { font-size: 13px; letter-spacing: 2px; margin: 40px 0 14px; color: #8a7760; font-weight: 700; }
+  .sub { font-size: 12px; color: #93826e; margin: 0 0 22px; letter-spacing: .5px; }
+
+  .font-row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .font-cell {
+    background: #fdf8ee;
+    border-radius: 10px;
+    padding: 18px 26px;
+    box-shadow: 0 8px 18px rgba(90, 60, 40, .18);
+    text-align: center;
+  }
+  .font-cell .glyphs { font-size: 64px; line-height: 1.3; color: #2e2a26; }
+  .font-cell .label { margin-top: 8px; font-size: 12px; color: #93826e; letter-spacing: 1px; }
+  .font-cell.picked { outline: 2px solid #c8962e; outline-offset: 3px; }
+  .font-cell.picked .label { color: #8a5a1e; font-weight: 700; }
+
+  .card-wrap {
+    display: inline-block;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 16px 34px rgba(90, 60, 40, .28);
+    max-width: 100%;
+  }
+  canvas { display: block; width: 900px; max-width: 100%; height: auto; }
+  .save {
+    display: inline-block;
+    margin-top: 18px;
+    padding: 9px 18px;
+    border-radius: 999px;
+    background: #8a5a1e;
+    color: #fff;
+    text-decoration: none;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<h1>邀請卡草稿 · 第三版</h1>
+<p class="sub">標題改用「把參考圖去背」做成的毛筆字圖檔（invite-title-hanshugyo.png），不是字體。下面的字體比較是上一版留著參考用的，目前整張卡片沒有用到它們</p>
+
+<h2>字體比較（上一版參考，目前未使用）</h2>
+<div class="font-row">
+  <div class="font-cell picked"><div class="glyphs" style="font-family:'Long Cang'">寒修行</div><div class="label">Long Cang · 採用</div></div>
+  <div class="font-cell"><div class="glyphs" style="font-family:'Ma Shan Zheng'">寒修行</div><div class="label">Ma Shan Zheng</div></div>
+  <div class="font-cell"><div class="glyphs" style="font-family:'Zhi Mang Xing'">寒修行</div><div class="label">Zhi Mang Xing</div></div>
+  <div class="font-cell"><div class="glyphs" style="font-family:'Liu Jian Mao Cao'">寒修行</div><div class="label">Liu Jian Mao Cao</div></div>
+</div>
+
+<h2>整張卡片</h2>
+<div class="card-wrap" id="cardWrap"></div>
+<br>
+<a class="save" id="saveBtn" download="邀請卡草稿.png">⤓ 下載這版 PNG</a>
+
+<script src="invite-card-draft.js?v=3"></script>
+<script>
+  (async () => {
+    // canvas 畫字之前一定要等字型真的載完，不然會先用預設字體畫一次
+    try {
+      await Promise.all([
+        document.fonts.load('130px "Long Cang"'),
+        document.fonts.load('130px "Ma Shan Zheng"'),
+        document.fonts.load('130px "Zhi Mang Xing"'),
+        document.fonts.load('130px "Liu Jian Mao Cao"'),
+      ]);
+      await document.fonts.ready;
+    } catch (e) {}
+    const [titleImage, qrImage] = await Promise.all([loadInviteTitleImage(), loadInviteQrImage()]);
+    const canvas = renderInviteCardDraft({ titleImage, qrImage });
+    document.getElementById("cardWrap").appendChild(canvas);
+    document.getElementById("saveBtn").href = canvas.toDataURL("image/png");
+  })();
+</script>
+</body>
+</html>

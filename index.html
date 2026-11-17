@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=62">
+<link rel="stylesheet" href="style.css?v=64">
 </head>
 <body>
 
@@ -27,8 +27,8 @@
   <span id="soundIcon">🔊</span>
 </button>
 
-<!-- 題庫管理入口：左上角幾乎看不見的小點，碰到才會浮出來 -->
-<a class="admin-dot" href="qa-admin.html" title="題庫管理" aria-label="題庫管理">⚙</a>
+<!-- 發送邀請函：左上角，點開後可以寫自己的話和名字，生成邀請卡分享出去 -->
+<button id="inviteBtn" class="invite-dot" aria-label="發送邀請函" title="發送邀請函">💌</button>
 
 <header class="page-head">
   <h1><span class="grad-text">真如世界大冒險·GO</span></h1>
@@ -155,9 +155,38 @@
   </div>
 </div>
 
+<!-- 發送邀請函：寫自己的話和名字，生成邀請卡分享出去（不用密碼） -->
+<div class="invite-overlay" id="inviteOverlay">
+  <div class="invite-card" id="inviteCard" role="dialog" aria-modal="true" aria-labelledby="inviteTitle" tabindex="-1">
+    <button class="invite-x" id="inviteX" aria-label="關閉">×</button>
+    <h2 class="invite-title" id="inviteTitle">發送邀請函</h2>
+    <p class="invite-sub">留下你的話和名字，邀請親友一起參加寒修行</p>
+
+    <div class="invite-preview-wrap">
+      <canvas class="invite-preview" id="invitePreview" width="900" height="600" aria-label="邀請卡預覽"></canvas>
+    </div>
+
+    <label class="invite-field">
+      <span>給對方的話</span>
+      <input type="text" id="inviteNote" maxlength="16" placeholder="例如：一起來走走吧！">
+    </label>
+    <label class="invite-field">
+      <span>你的名字</span>
+      <input type="text" id="inviteName" maxlength="10" placeholder="例如：小明">
+    </label>
+
+    <div class="invite-actions">
+      <a class="invite-save" id="inviteSave" download aria-live="polite">⤓ 下載邀請卡</a>
+      <button class="invite-line" id="inviteLine" type="button" hidden>📨 用 LINE 傳送</button>
+    </div>
+    <p class="invite-hint" id="inviteHint">手機會直接跳出分享選單，選 LINE 傳給朋友。</p>
+  </div>
+</div>
+
 <div class="confetti-layer" id="confettiLayer"></div>
 
 <script src="omamori-postcard.js?v=6"></script>
-<script src="script.js?v=69"></script>
+<script src="invite-card-draft.js?v=1"></script>
+<script src="script.js?v=71"></script>
 </body>
 </html>

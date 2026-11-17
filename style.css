@@ -157,6 +157,33 @@ body {
   .admin-dot { transition: none; }
 }
 
+/* ---------- 發送邀請函入口（左上角，跟右上角音效鈕對稱）---------- */
+.invite-dot {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(14px, env(safe-area-inset-left));
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: var(--surface);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 6px 18px rgba(var(--shadow-rgb), 0.22);
+}
+.invite-dot:hover { transform: translateY(-2px); }
+.invite-dot:focus-visible { outline: 2px solid var(--accent-1); outline-offset: 2px; }
+@media (max-width: 400px) {
+  .invite-dot { width: 34px; height: 34px; font-size: 15px; }
+}
+
 /* ---------- header ---------- */
 .page-head {
   position: relative;
@@ -1415,4 +1442,163 @@ body {
   .omamori-stage.revealed .omamori-box-img { animation: none; opacity: 1; }
   .omamori-knot { animation: none; }
   .omamori-word { transition: opacity 0.2s ease; transform: none; }
+}
+
+/* ---------- 發送邀請函：寫自己的話、預覽、分享 ---------- */
+.invite-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 44, 24, 0.5);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 55;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.invite-overlay.show { opacity: 1; pointer-events: auto; }
+
+.invite-card {
+  position: relative;
+  width: min(92vw, 520px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: clamp(18px, 4vw, 26px) clamp(16px, 4vw, 26px) clamp(16px, 3.5vw, 22px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 26px;
+  background: linear-gradient(170deg, #fffbf4, #ffeedb);
+  border: 1px solid rgba(var(--warm-ink-rgb), 0.2);
+  box-shadow: 0 26px 70px rgba(var(--shadow-rgb), 0.34), 0 0 70px rgba(var(--gold-rgb), 0.14);
+  transform: translateY(-46px) scale(0.96);
+  opacity: 0;
+  transition: transform 0.55s cubic-bezier(.22,.78,.3,1), opacity 0.4s ease;
+}
+.invite-overlay.show .invite-card { transform: translateY(0) scale(1); opacity: 1; }
+.invite-card:focus { outline: none; }
+
+.invite-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 253, 248, 0.8);
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.invite-x:hover { background: #fff; color: var(--text); }
+
+.invite-title {
+  margin: 0 28px 2px 0;
+  font-size: clamp(17px, 4vw, 20px);
+  font-weight: 800;
+  color: var(--text);
+}
+.invite-sub {
+  margin: 0 0 14px;
+  font-size: clamp(12px, 3vw, 13px);
+  color: var(--text-dim);
+}
+
+.invite-preview-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 10px 24px rgba(var(--shadow-rgb), 0.2);
+  margin-bottom: 16px;
+  background: #fdf8ee;
+}
+.invite-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.invite-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+.invite-field input {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--panel-border);
+  background: rgba(255, 253, 248, 0.9);
+}
+.invite-field input:focus {
+  outline: none;
+  border-color: var(--accent-1);
+}
+
+.invite-actions {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* LINE 的品牌綠，純粹用來讓人一眼認出這是「傳去 LINE」的按鈕，不是官方標誌 */
+.invite-line {
+  padding: 12px 26px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #06c856, #00b140);
+  color: #fff;
+  font-family: inherit;
+  font-size: clamp(14px, 3.4vw, 16px);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 177, 64, 0.32);
+  transition: transform 0.18s ease;
+}
+.invite-line:hover { transform: translateY(-2px); }
+.invite-line[hidden] { display: none; }
+
+.invite-save {
+  padding: 12px 34px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-3), var(--accent-1));
+  color: #fffaf2;
+  font-size: clamp(14px, 3.4vw, 16px);
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(var(--accent-1-rgb), 0.32);
+  transition: transform 0.18s ease;
+}
+.invite-save:hover { transform: translateY(-2px); }
+
+.invite-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-card { transition: opacity 0.2s ease; transform: none; }
+  .invite-overlay.show .invite-card { transform: none; }
 }

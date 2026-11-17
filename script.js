@@ -249,6 +249,16 @@ const omamoriCountEl = document.getElementById("omamoriCount");
 const omamoriWordText = document.getElementById("omamoriWordText");
 const omamoriWordBy = document.getElementById("omamoriWordBy");
 const confettiLayer = document.getElementById("confettiLayer");
+const inviteBtn = document.getElementById("inviteBtn");
+const inviteOverlay = document.getElementById("inviteOverlay");
+const inviteCard = document.getElementById("inviteCard");
+const inviteX = document.getElementById("inviteX");
+const invitePreview = document.getElementById("invitePreview");
+const inviteNote = document.getElementById("inviteNote");
+const inviteName = document.getElementById("inviteName");
+const inviteSave = document.getElementById("inviteSave");
+const inviteLine = document.getElementById("inviteLine");
+const inviteHint = document.getElementById("inviteHint");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
 const stageEl = document.querySelector(".stage");
@@ -644,7 +654,7 @@ function pickFrom(pool) {
 // ---------- 彈窗的焦點管理 ----------
 // 開啟：背景設成 inert（不能 Tab、不能點、讀螢幕軟體也略過），焦點移進視窗，雪花暫停。
 // 關閉：把這一切還原，焦點回到擲骰按鈕。
-const BG_SELECTORS = ".page-head, .stage, #soundToggle, .admin-dot";
+const BG_SELECTORS = ".page-head, .stage, #soundToggle, .admin-dot, .invite-dot";
 
 function setBackgroundInert(on) {
   document.querySelectorAll(BG_SELECTORS).forEach((el) => {
@@ -1254,17 +1264,159 @@ if (omamoriOverlay) {
   });
 }
 
+// ---------- 發送邀請函：自己打話、簽名字，疊在邀請卡印章上方，分享出去 ----------
+// 不需要密碼——這是給所有玩家用的功能，跟題庫管理（admin-dot）完全不同。
+let inviteAssets = null; // 毛筆字圖＋QR code，只載入一次，之後每次重畫都重複用
+let inviteFile = null; // 目前預覽對應的檔案，給下方分享／下載按鈕用
+let invitePreviewToken = 0; // 每次重畫 +1，讓太舊的非同步結果自己作廢
+
+async function getInviteAssets() {
+  if (!inviteAssets) {
+    const [titleImage, qrImage] = await Promise.all([loadInviteTitleImage(), loadInviteQrImage()]);
+    inviteAssets = { titleImage, qrImage };
+  }
+  return inviteAssets;
+}
+
+function inviteFileName(name) {
+  const who = name.trim();
+  return who ? `寒修行邀請函_${who}.png` : "寒修行邀請函.png";
+}
+
+function clearInvitePreview() {
+  invitePreviewToken += 1; // 還在跑的那次 refresh 作廢
+  const url = inviteSave.getAttribute("href");
+  if (url) URL.revokeObjectURL(url);
+  inviteSave.removeAttribute("href");
+  inviteFile = null;
+}
+
+async function refreshInvitePreview() {
+  const token = ++invitePreviewToken;
+  const { titleImage, qrImage } = await getInviteAssets();
+  if (token !== invitePreviewToken || !inviteOverlay.classList.contains("show")) return;
+
+  const personalNote = inviteNote.value.trim();
+  const personalName = inviteName.value.trim();
+  const canvas = renderInviteCardDraft({ titleImage, qrImage, personalNote, personalName });
+  const pctx = invitePreview.getContext("2d");
+  pctx.clearRect(0, 0, invitePreview.width, invitePreview.height);
+  pctx.drawImage(canvas, 0, 0, invitePreview.width, invitePreview.height);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (token !== invitePreviewToken) return;
+  if (!blob) {
+    inviteSave.textContent = "邀請卡製作失敗";
+    inviteSave.removeAttribute("href");
+    inviteFile = null;
+    return;
+  }
+  const file = new File([blob], inviteFileName(personalName), { type: "image/png" });
+  inviteFile = file;
+  const oldUrl = inviteSave.getAttribute("href");
+  inviteSave.href = URL.createObjectURL(file);
+  inviteSave.download = file.name;
+  // 手機的分享選單本身就找得到 LINE、還能直接帶圖，LINE 按鈕留給分享選單叫不出來的裝置用
+  const canShareSheet = canSaveToAlbum(file);
+  inviteSave.textContent = canShareSheet ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
+  if (inviteLine) {
+    inviteLine.hidden = canShareSheet;
+    if (inviteHint) {
+      inviteHint.textContent = canShareSheet
+        ? "手機會直接跳出分享選單，選 LINE 傳給朋友。"
+        : "按「用 LINE 傳送」會先存好圖片、順便開啟 LINE；記得在 LINE 裡把圖片也附加上去。";
+    }
+  }
+  if (oldUrl) URL.revokeObjectURL(oldUrl);
+}
+
+let invitePreviewTimer = null;
+function queueInvitePreview() {
+  clearTimeout(invitePreviewTimer);
+  invitePreviewTimer = setTimeout(refreshInvitePreview, 150);
+}
+
+// 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
+async function saveInviteAs(file) {
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: file.name,
+      types: [{ description: "PNG 圖檔", accept: { "image/png": [".png"] } }],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(file);
+    await writable.close();
+    showToast("💌 邀請卡已存檔");
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // 使用者自己按取消
+    omamoriFallbackDownload(file);
+  }
+}
+
+function openInvite() {
+  SFX.click();
+  inviteSave.textContent = "邀請卡製作中…";
+  inviteOverlay.classList.add("show");
+  dialogOpened(inviteCard, inviteNote);
+  refreshInvitePreview();
+}
+
+function closeInvite() {
+  inviteOverlay.classList.remove("show");
+  SFX.click();
+  clearInvitePreview();
+  dialogsClosed();
+  inviteBtn.focus({ preventScroll: true });
+}
+
+if (inviteBtn) {
+  inviteBtn.addEventListener("click", openInvite);
+  inviteX.addEventListener("click", closeInvite);
+  inviteOverlay.addEventListener("click", (e) => {
+    if (e.target === inviteOverlay) closeInvite(); // 和其他視窗一樣：點背景就關
+  });
+  inviteNote.addEventListener("input", queueInvitePreview);
+  inviteName.addEventListener("input", queueInvitePreview);
+  inviteSave.addEventListener("click", (e) => {
+    const file = inviteFile;
+    if (!file) {
+      e.preventDefault();
+      return;
+    }
+    // 手機：叫出分享選單，LINE 就在裡面，點了直接傳
+    if (canSaveToAlbum(file)) {
+      e.preventDefault();
+      SFX.click();
+      navigator.share({ files: [file], title: "寒修行邀請函" }).catch((err) => {
+        if (err && err.name === "AbortError") return; // 使用者自己關掉選單
+        omamoriFallbackDownload(file);
+      });
+      return;
+    }
+    // 電腦（Chrome／Edge）：自己挑存放目錄，再手動到 LINE 傳送
+    if (window.showSaveFilePicker) {
+      e.preventDefault();
+      saveInviteAs(file);
+      return;
+    }
+    // 其他瀏覽器：交給 <a download>，存到預設下載資料夾
+  });
+}
+
 document.addEventListener("keydown", (e) => {
+  const inviteOpen = !!inviteOverlay && inviteOverlay.classList.contains("show");
   const omamoriOpen = !!omamoriOverlay && omamoriOverlay.classList.contains("show");
   const quizOpen = !!quizOverlay && quizOverlay.classList.contains("show");
   const modalOpen = modalOverlay.classList.contains("show");
   if (e.key === "Escape") {
-    if (omamoriOpen) closeOmamori();
+    if (inviteOpen) closeInvite();
+    else if (omamoriOpen) closeOmamori();
     else if (quizOpen) closeQuiz();
     else if (modalOpen) closeModal();
     return;
   }
-  if (omamoriOpen) trapTab(e, omamoriCard);
+  if (inviteOpen) trapTab(e, inviteCard);
+  else if (omamoriOpen) trapTab(e, omamoriCard);
   else if (quizOpen) trapTab(e, quizCard);
   else if (modalOpen) trapTab(e, modalCard);
 });
