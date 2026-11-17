@@ -1401,6 +1401,29 @@ if (inviteBtn) {
     }
     // 其他瀏覽器：交給 <a download>，存到預設下載資料夾
   });
+
+  // 電腦沒有手機那種「分享選單」，LINE 也沒開放讓網頁直接把圖片塞進對話——
+  // 能做到的是：開啟 LINE 並帶入祝福文字，圖片用上面存好的那張，使用者自己在 LINE 裡附加。
+  if (inviteLine) {
+    inviteLine.addEventListener("click", () => {
+      const file = inviteFile;
+      if (!file) return;
+      SFX.click();
+      const note = inviteNote.value.trim();
+      const name = inviteName.value.trim();
+      const lines = [];
+      if (note) lines.push(`「${note}」`);
+      lines.push(name ? `—— ${name} 誠摯邀請你參加 2027寒修行` : "誠摯邀請你參加 2027寒修行");
+      lines.push("（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
+      // window.open 要先呼叫，才算在這次點擊的使用者操作權限內，不會被瀏覽器擋下來
+      window.open("https://line.me/R/msg/text/?" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
+      if (window.showSaveFilePicker) {
+        saveInviteAs(file);
+      } else {
+        omamoriFallbackDownload(file);
+      }
+    });
+  }
 }
 
 document.addEventListener("keydown", (e) => {
