@@ -1267,10 +1267,16 @@ if (omamoriOverlay) {
 // ---------- 發送邀請函：自己打話、簽名字，疊在邀請卡印章上方，分享出去 ----------
 // 不需要密碼——這是給所有玩家用的功能，跟題庫管理（admin-dot）完全不同。
 // 最後做出來的檔案是會動的 GIF（仙鶴拍翅膀），用 gif.js 在背景執行緒編碼。
-let inviteAssets = null; // 毛筆字圖＋QR code，只載入一次，之後每次重畫、每一幀都重複用
-let inviteFile = null; // 目前準備好的 GIF 檔，給下方分享／下載按鈕用
-let inviteBuildToken = 0; // 每次重做 GIF +1，讓做到一半、已經過時的結果自動作廢
-let inviteAnimTimer = null; // 預覽畫布的動畫（只重畫 canvas，不編碼），開關視窗時連動
+//
+// 打字的時候完全不做任何重的事——不即時重畫動畫、不背景編 GIF。
+// 之前試過「邊打字邊在背景做 GIF」，結果在比較慢的裝置上這段工作會跟打字搶主執行緒，
+// 越打越卡，看起來就像字打不進去、被吃掉。改成只有在按下「下載」／「用 LINE 傳送」
+// 那一刻才真正開始做圖，輸入框全程不受任何背景工作干擾。
+let inviteAssets = null; // 毛筆字圖＋QR code，只載入一次
+let inviteFile = null; // 目前已經做好、可以直接用的 GIF 檔
+let inviteDirty = true; // 文字改過、還沒重做 GIF
+let inviteBuildToken = 0; // 每次做 GIF +1，讓做到一半又被取代的結果自動作廢
+let invitePreviewTimer = null; // 靜態預覽圖的 debounce（只是重畫一次 canvas，不編碼）
 
 async function getInviteAssets() {
   if (!inviteAssets) {
@@ -1285,67 +1291,36 @@ function inviteFileName(name) {
   return who ? `寒修行邀請函_${who}.gif` : "寒修行邀請函.gif";
 }
 
-// 預覽畫布只是重畫一次 canvas，很便宜，拿來讓仙鶴在視窗開著時持續拍翅膀；
-// 跟下面真正「做成 GIF」的那份編碼完全分開，不然每一幀都編碼會非常浪費。
-function drawInvitePreviewFrame(flapPhase) {
+// 只重畫一次 canvas（固定姿勢，不是動畫迴圈），讓對話框裡可以看到文字疊上去的樣子。
+// 用 debounce 延遲一下、而且只畫一次就停，不會跟打字搶主執行緒。
+function drawInvitePreviewOnce() {
   if (!inviteAssets) return;
   const personalNote = inviteNote.value.trim();
   const personalName = inviteName.value.trim();
-  const canvas = renderInviteCardDraft({ ...inviteAssets, personalNote, personalName, flap: flapPhase, pixelScale: 1 });
+  const canvas = renderInviteCardDraft({ ...inviteAssets, personalNote, personalName, flap: 0, pixelScale: 1 });
   const pctx = invitePreview.getContext("2d");
   pctx.clearRect(0, 0, invitePreview.width, invitePreview.height);
   pctx.drawImage(canvas, 0, 0, invitePreview.width, invitePreview.height);
 }
 
-let inviteComposing = false; // 注音／拼音選字中：這段時間完全不要重畫，不然會跟輸入法打架
-
-function startInviteAnim() {
-  stopInviteAnim();
-  const t0 = performance.now();
-  inviteAnimTimer = setInterval(() => {
-    if (!inviteOverlay.classList.contains("show") || inviteComposing) return;
-    drawInvitePreviewFrame(((performance.now() - t0) / 1600) % 1); // 一圈 1.6 秒，慢慢拍
-  }, 90);
+function queueInvitePreview() {
+  inviteDirty = true;
+  clearTimeout(invitePreviewTimer);
+  invitePreviewTimer = setTimeout(drawInvitePreviewOnce, 250);
 }
 
-function stopInviteAnim() {
-  clearInterval(inviteAnimTimer);
-  inviteAnimTimer = null;
-}
-
-function clearInviteFile() {
-  inviteBuildToken += 1; // 還在做的那份 GIF 作廢
-  const url = inviteSave.getAttribute("href");
-  if (url) URL.revokeObjectURL(url);
-  inviteSave.removeAttribute("href");
-  inviteFile = null;
-}
-
-// 正式做 GIF：背景執行完才讓分享／下載按鈕生效，期間按鈕顯示「製作動畫中…」
-async function buildInviteFile() {
-  const token = ++inviteBuildToken;
-  inviteSave.textContent = "製作動畫中…";
-  const assets = await getInviteAssets();
-  if (token !== inviteBuildToken || !inviteOverlay.classList.contains("show")) return;
-
-  const personalNote = inviteNote.value.trim();
-  const personalName = inviteName.value.trim();
-  let blob;
+// 裝置是否叫得出手機那種「分享選單」——跟實際檔案內容無關，先用一個假檔案探一次就好，
+// 這樣按鈕文字一開始就能顯示對的字，不用等真正的 GIF 做完。
+function canShareInviteFiles() {
   try {
-    blob = await buildInviteGif({ ...assets, personalNote, personalName });
+    return canSaveToAlbum(new File([new Uint8Array([0])], "p.gif", { type: "image/gif" }));
   } catch {
-    if (token === inviteBuildToken) inviteSave.textContent = "邀請卡製作失敗";
-    return;
+    return false;
   }
-  if (token !== inviteBuildToken) return; // 做的時候使用者又改了輸入，這份已經過時，丟掉
+}
 
-  const file = new File([blob], inviteFileName(personalName), { type: "image/gif" });
-  inviteFile = file;
-  const oldUrl = inviteSave.getAttribute("href");
-  inviteSave.href = URL.createObjectURL(file);
-  inviteSave.download = file.name;
-  // 手機的分享選單本身就找得到 LINE、還能直接帶圖，LINE 按鈕留給分享選單叫不出來的裝置用
-  const canShareSheet = canSaveToAlbum(file);
+function syncInviteButtonLabel() {
+  const canShareSheet = canShareInviteFiles();
   inviteSave.textContent = canShareSheet ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
   if (inviteLine) {
     inviteLine.hidden = canShareSheet;
@@ -1355,14 +1330,118 @@ async function buildInviteFile() {
         : "按「用 LINE 傳送」會先存好圖片、順便開啟 LINE；記得在 LINE 裡把圖片也附加上去。";
     }
   }
-  if (oldUrl) URL.revokeObjectURL(oldUrl);
 }
 
-let inviteBuildTimer = null;
-function queueInviteBuild() {
-  clearTimeout(inviteBuildTimer);
+// 真正做 GIF：只在按下分享／下載按鈕的那一刻呼叫。已經做好、文字又沒改過就直接重複用。
+async function ensureInviteFile() {
+  if (inviteFile && !inviteDirty) return inviteFile;
+  const token = ++inviteBuildToken;
+  const label = inviteSave.textContent;
   inviteSave.textContent = "製作動畫中…";
-  inviteBuildTimer = setTimeout(buildInviteFile, 500);
+  try {
+    const assets = await getInviteAssets();
+    const personalNote = inviteNote.value.trim();
+    const personalName = inviteName.value.trim();
+    const blob = await buildInviteGif({ ...assets, personalNote, personalName });
+    if (token !== inviteBuildToken) return inviteFile; // 這份還沒做完，使用者又點了一次，用最新那份就好
+    inviteFile = new File([blob], inviteFileName(personalName), { type: "image/gif" });
+    inviteDirty = false;
+    return inviteFile;
+  } catch {
+    if (token === inviteBuildToken) inviteSave.textContent = label;
+    throw new Error("邀請卡製作失敗");
+  }
+}
+
+function openInvite() {
+  SFX.click();
+  // 每次打開都換一組亂數 name／id，讓瀏覽器的自動完成沒辦法把這次的欄位
+  // 跟之前任何一次測試對上號、生出下拉建議——這是這類問題最常見的成因。
+  const rnd = Math.random().toString(36).slice(2, 10);
+  inviteNote.name = `inviteNote_${rnd}`;
+  inviteName.name = `inviteName_${rnd}`;
+  inviteNote.value = "";
+  inviteName.value = "";
+  inviteDirty = true;
+  inviteOverlay.classList.add("show");
+  dialogOpened(inviteCard, inviteNote);
+  syncInviteButtonLabel();
+  getInviteAssets().then(() => {
+    if (inviteOverlay.classList.contains("show")) drawInvitePreviewOnce();
+  });
+}
+
+function closeInvite() {
+  inviteOverlay.classList.remove("show");
+  SFX.click();
+  clearTimeout(invitePreviewTimer);
+  dialogsClosed();
+  inviteBtn.focus({ preventScroll: true });
+}
+
+if (inviteBtn) {
+  inviteBtn.addEventListener("click", openInvite);
+  inviteX.addEventListener("click", closeInvite);
+  inviteOverlay.addEventListener("click", (e) => {
+    if (e.target === inviteOverlay) closeInvite(); // 和其他視窗一樣：點背景就關
+  });
+  inviteNote.addEventListener("input", queueInvitePreview);
+  inviteName.addEventListener("input", queueInvitePreview);
+
+  inviteSave.addEventListener("click", async (e) => {
+    e.preventDefault(); // 檔案是點了才現做，href 不會預先準備好，全程自己接管
+    let file;
+    try {
+      file = await ensureInviteFile();
+    } catch {
+      showToast("邀請卡製作失敗，請再試一次");
+      syncInviteButtonLabel();
+      return;
+    }
+    syncInviteButtonLabel();
+    // 手機：叫出分享選單，LINE 就在裡面，點了直接傳
+    if (canSaveToAlbum(file)) {
+      SFX.click();
+      navigator.share({ files: [file], title: "寒修行邀請函" }).catch((err) => {
+        if (err && err.name === "AbortError") return; // 使用者自己關掉選單
+        omamoriFallbackDownload(file);
+      });
+      return;
+    }
+    // 電腦（Chrome／Edge）：自己挑存放目錄；其他瀏覽器就直接存到預設下載資料夾
+    if (window.showSaveFilePicker) {
+      saveInviteAs(file);
+    } else {
+      omamoriFallbackDownload(file);
+    }
+  });
+
+  // 電腦沒有手機那種「分享選單」，LINE 也沒開放讓網頁直接把圖片塞進對話——
+  // 能做到的是：開啟 LINE 並帶入祝福文字，圖片用上面存好的那張，使用者自己在 LINE 裡附加。
+  if (inviteLine) {
+    inviteLine.addEventListener("click", async () => {
+      let file;
+      try {
+        file = await ensureInviteFile();
+      } catch {
+        showToast("邀請卡製作失敗，請再試一次");
+        return;
+      }
+      SFX.click();
+      const note = inviteNote.value.trim();
+      const name = inviteName.value.trim();
+      const lines = [];
+      if (note) lines.push(`「${note}」`);
+      lines.push(name ? `—— ${name} 誠摯邀請你參加 2027寒修行` : "誠摯邀請你參加 2027寒修行");
+      lines.push("（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
+      window.open("https://line.me/R/msg/text/?" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
+      if (window.showSaveFilePicker) {
+        saveInviteAs(file);
+      } else {
+        omamoriFallbackDownload(file);
+      }
+    });
+  }
 }
 
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
@@ -1379,98 +1458,6 @@ async function saveInviteAs(file) {
   } catch (err) {
     if (err && err.name === "AbortError") return; // 使用者自己按取消
     omamoriFallbackDownload(file);
-  }
-}
-
-function openInvite() {
-  SFX.click();
-  inviteSave.textContent = "製作動畫中…";
-  inviteOverlay.classList.add("show");
-  dialogOpened(inviteCard, inviteNote);
-  getInviteAssets().then(() => {
-    if (inviteOverlay.classList.contains("show")) startInviteAnim();
-  });
-  queueInviteBuild();
-}
-
-function closeInvite() {
-  inviteOverlay.classList.remove("show");
-  SFX.click();
-  stopInviteAnim();
-  clearInviteFile();
-  dialogsClosed();
-  inviteBtn.focus({ preventScroll: true });
-}
-
-if (inviteBtn) {
-  inviteBtn.addEventListener("click", openInvite);
-  inviteX.addEventListener("click", closeInvite);
-  inviteOverlay.addEventListener("click", (e) => {
-    if (e.target === inviteOverlay) closeInvite(); // 和其他視窗一樣：點背景就關
-  });
-  // 中文輸入法選字的時候，瀏覽器會連續送出好幾次 input 事件（還沒選定的候選字）。
-  // 這段期間先不要重畫預覽、也先不要排 GIF 重建，免得跟輸入法搶主執行緒，
-  // 把使用者正在組字、甚至已經選定的字擠掉——等選字結束（compositionend）才真正處理。
-  const handleInviteTextInput = () => {
-    if (inviteComposing) return;
-    queueInviteBuild();
-  };
-  for (const el of [inviteNote, inviteName]) {
-    el.addEventListener("compositionstart", () => {
-      inviteComposing = true;
-    });
-    el.addEventListener("compositionend", () => {
-      inviteComposing = false;
-      queueInviteBuild();
-    });
-    el.addEventListener("input", handleInviteTextInput);
-  }
-  inviteSave.addEventListener("click", (e) => {
-    const file = inviteFile;
-    if (!file) {
-      e.preventDefault();
-      return;
-    }
-    // 手機：叫出分享選單，LINE 就在裡面，點了直接傳
-    if (canSaveToAlbum(file)) {
-      e.preventDefault();
-      SFX.click();
-      navigator.share({ files: [file], title: "寒修行邀請函" }).catch((err) => {
-        if (err && err.name === "AbortError") return; // 使用者自己關掉選單
-        omamoriFallbackDownload(file);
-      });
-      return;
-    }
-    // 電腦（Chrome／Edge）：自己挑存放目錄，再手動到 LINE 傳送
-    if (window.showSaveFilePicker) {
-      e.preventDefault();
-      saveInviteAs(file);
-      return;
-    }
-    // 其他瀏覽器：交給 <a download>，存到預設下載資料夾
-  });
-
-  // 電腦沒有手機那種「分享選單」，LINE 也沒開放讓網頁直接把圖片塞進對話——
-  // 能做到的是：開啟 LINE 並帶入祝福文字，圖片用上面存好的那張，使用者自己在 LINE 裡附加。
-  if (inviteLine) {
-    inviteLine.addEventListener("click", () => {
-      const file = inviteFile;
-      if (!file) return;
-      SFX.click();
-      const note = inviteNote.value.trim();
-      const name = inviteName.value.trim();
-      const lines = [];
-      if (note) lines.push(`「${note}」`);
-      lines.push(name ? `—— ${name} 誠摯邀請你參加 2027寒修行` : "誠摯邀請你參加 2027寒修行");
-      lines.push("（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
-      // window.open 要先呼叫，才算在這次點擊的使用者操作權限內，不會被瀏覽器擋下來
-      window.open("https://line.me/R/msg/text/?" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
-      if (window.showSaveFilePicker) {
-        saveInviteAs(file);
-      } else {
-        omamoriFallbackDownload(file);
-      }
-    });
   }
 }
 

@@ -373,25 +373,27 @@ function renderInviteCardDraft(opts = {}) {
 /* 把邀請卡做成會動的 GIF（仙鶴拍翅膀）。
    用 gif.js（vendor 進這個資料夾的 gif.js / gif.worker.js，離線也能跑）在背景執行緒編碼，
    每一幀都是 renderInviteCardDraft 再畫一次、只有 flap 不一樣，所以預覽動畫和匯出的 GIF
-   長得保證一樣。幀數故意不多、解析度用 1 倍——GIF 本來就不追求銳利，優先顧編碼速度和檔案大小。 */
-function buildInviteGif(opts = {}, { frames = 8, delayMs = 110 } = {}) {
+   長得保證一樣。幀數故意不多、解析度用 1 倍——GIF 本來就不追求銳利，優先顧編碼速度和檔案大小。
+
+   每畫完一幀都用 setTimeout(0) 讓出主執行緒一下，不要 8 幀連著畫、整段把主執行緒佔住——
+   這段如果連續卡住一兩百毫秒，使用者剛好在這段時間打字（尤其是用注音／拼音選字）
+   就會被打斷，嚴重時輸入法會把還沒選定、甚至剛選定的字弄丟。 */
+async function buildInviteGif(opts = {}, { frames = 6, delayMs = 130 } = {}) {
+  if (typeof GIF !== "function") throw new Error("gif.js 沒有載入");
+  const gif = new GIF({
+    workers: 2,
+    quality: 14,
+    width: 900,
+    height: 600,
+    workerScript: "gif.worker.js",
+    repeat: 0, // 不停循環
+  });
+  for (let i = 0; i < frames; i++) {
+    const canvas = renderInviteCardDraft({ ...opts, pixelScale: 1, flap: i / frames });
+    gif.addFrame(canvas, { delay: delayMs, copy: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
   return new Promise((resolve, reject) => {
-    if (typeof GIF !== "function") {
-      reject(new Error("gif.js 沒有載入"));
-      return;
-    }
-    const gif = new GIF({
-      workers: 2,
-      quality: 12,
-      width: 900,
-      height: 600,
-      workerScript: "gif.worker.js",
-      repeat: 0, // 不停循環
-    });
-    for (let i = 0; i < frames; i++) {
-      const canvas = renderInviteCardDraft({ ...opts, pixelScale: 1, flap: i / frames });
-      gif.addFrame(canvas, { delay: delayMs, copy: true });
-    }
     gif.on("finished", (blob) => resolve(blob));
     gif.on("abort", () => reject(new Error("GIF 製作中斷")));
     gif.render();
