@@ -181,33 +181,59 @@ function renderInviteCardDraft(opts = {}) {
   ctx.letterSpacing = "0px";
 
   // ---------- 發送者留言：寫在印章上方那塊空白（旭日、仙鶴下面，印章上面）----------
-  // 只有一行，太長就截斷加「…」，避免跟印章或邀請詞疊在一起
-  function fitOneLine(text, font, maxWidth) {
+  // 字數在限制內最多排兩行；真的排不下才截斷加「…」（正常輸入長度不會發生）。
+  function wrapLines(text, font, maxWidth, maxLines) {
     ctx.font = font;
-    if (ctx.measureText(text).width <= maxWidth) return text;
-    let line = text;
-    while (line.length > 1 && ctx.measureText(line + "…").width > maxWidth) {
-      line = line.slice(0, -1);
+    // 標點不開頭：」』）的這類收尾符號寧可讓上一行稍微超寬，也不要自己落單開新行
+    const noLineStart = "」』）】》〉，。！？、；：”’";
+    const lines = [];
+    let line = "";
+    for (const ch of text) {
+      const next = line + ch;
+      if (line && ctx.measureText(next).width > maxWidth && !noLineStart.includes(ch)) {
+        lines.push(line);
+        line = ch;
+      } else {
+        line = next;
+      }
     }
-    return line + "…";
+    if (line) lines.push(line);
+    if (lines.length > maxLines) {
+      lines.length = maxLines;
+      let last = lines[maxLines - 1];
+      while (last.length > 1 && ctx.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
+      lines[maxLines - 1] = last + "…";
+    }
+    return lines;
+  }
+  function fitOneLine(text, font, maxWidth) {
+    return wrapLines(text, font, maxWidth, 1)[0];
   }
   if (personalNote || personalName) {
     const noteRight = W - 72;
-    const noteMaxWidth = 320;
+    const noteMaxWidth = 380;
+    const noteFont = `italic 23px ${serif}`;
+    const nameFont = `bold 17px ${sans}`;
+    const noteLineH = 30;
     ctx.textAlign = "right";
-    let noteY = 300;
-    if (personalNote) {
-      const noteFont = `italic 23px ${serif}`;
-      ctx.font = noteFont;
-      ctx.fillStyle = ink;
-      ctx.fillText(fitOneLine(`「${personalNote}」`, noteFont, noteMaxWidth), noteRight, noteY);
-      noteY += 34;
-    }
+
+    // 由印章上緣往上排版：字少就貼著印章，字多（最多兩行）就自然往上長，
+    // 需要的話疊到旭日上也沒關係——優先顧好字能完整顯示，不要被截斷。
+    let y = 352;
     if (personalName) {
-      const nameFont = `bold 17px ${sans}`;
       ctx.font = nameFont;
       ctx.fillStyle = "rgba(168, 54, 44, 0.85)";
-      ctx.fillText(fitOneLine(`—— ${personalName}`, nameFont, noteMaxWidth), noteRight, noteY);
+      ctx.fillText(fitOneLine(`—— ${personalName}`, nameFont, noteMaxWidth), noteRight, y);
+      y -= 34;
+    }
+    if (personalNote) {
+      const noteLines = wrapLines(`「${personalNote}」`, noteFont, noteMaxWidth, 2);
+      ctx.font = noteFont;
+      ctx.fillStyle = ink;
+      for (let i = noteLines.length - 1; i >= 0; i--) {
+        ctx.fillText(noteLines[i], noteRight, y);
+        y -= noteLineH;
+      }
     }
     ctx.textAlign = "left";
   }
