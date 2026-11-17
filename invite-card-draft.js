@@ -30,7 +30,7 @@ function renderInviteCardDraft(opts = {}) {
     eyebrow = "誠摯邀請",
     title = "寒修行",
     tagline = "反省．充實．重整",
-    body = "與真如家人一起沉澱初心、重新出發。",
+    body = "一起沉澱初心 重新出發👣👣",
     // 開白／中願／結願三階段，日期沿用官網 shinnyo-en.org.tw/at2026 當季公告的寫法
     // （只寫月/日和星期，不寫年份——跟官網那頁本身的寫法一致，年份交給下面的 yearLabel）
     schedule = [
@@ -41,7 +41,7 @@ function renderInviteCardDraft(opts = {}) {
     seal = "敬邀",
     yearLabel = "2027寒修行",
     gameLabel = "真如世界大冒險・GO",
-    cta = "歡迎瀏覽",
+    cta = "歡迎參觀",
     titleFont = '"Long Cang"',
     titleImage = null, // 去背後的「寒修行」毛筆字圖檔（loadInviteTitleImage 的結果）
     qrImage = null, // 真正的 QR code 圖檔（loadInviteQrImage 的結果），沒給就畫占位框
@@ -256,7 +256,7 @@ function renderInviteCardDraft(opts = {}) {
 
   // ---------- 內文（邀請詞）----------
   ctx.fillStyle = "#3a332a";
-  ctx.font = `25px ${serif}`;
+  ctx.font = `bold 36px ${serif}`;
   const bodyLines = body.split("\n");
   const lineHeight = 42;
   const bodyTop = titleBottom + 94;
