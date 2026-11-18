@@ -30,7 +30,7 @@ function renderInviteCardDraft(opts = {}) {
     eyebrow = "誠摯邀請",
     title = "寒修行",
     tagline = "反省．充實．重整",
-    body = "一起沉澱初心 重新出發👣👣",
+    body = "一起沉澱初心 重新出發 👣👣",
     // 開白／中願／結願三階段，日期沿用官網 shinnyo-en.org.tw/at2026 當季公告的寫法
     // （只寫月/日和星期，不寫年份——跟官網那頁本身的寫法一致，年份交給下面的 yearLabel）
     schedule = [
@@ -228,8 +228,9 @@ function renderInviteCardDraft(opts = {}) {
   if (personalNote || personalName) {
     const noteRight = W - 72;
     const noteMaxWidth = 380;
-    const noteFont = `italic 23px ${serif}`;
-    const nameFont = `bold 17px ${sans}`;
+    const noteColor = "rgba(168, 54, 44, 0.9)"; // 給對方的話／名字共用同一個紅色粗體
+    const noteFont = `bold italic 24px ${serif}`;
+    const nameFont = `bold 18px ${sans}`;
     const noteLineH = 30;
     ctx.textAlign = "right";
 
@@ -238,14 +239,14 @@ function renderInviteCardDraft(opts = {}) {
     let y = 352;
     if (personalName) {
       ctx.font = nameFont;
-      ctx.fillStyle = "rgba(168, 54, 44, 0.85)";
+      ctx.fillStyle = noteColor;
       ctx.fillText(fitOneLine(`—— ${personalName}`, nameFont, noteMaxWidth), noteRight, y);
       y -= 34;
     }
     if (personalNote) {
       const noteLines = wrapLines(`「${personalNote}」`, noteFont, noteMaxWidth, 2);
       ctx.font = noteFont;
-      ctx.fillStyle = ink;
+      ctx.fillStyle = noteColor;
       for (let i = noteLines.length - 1; i >= 0; i--) {
         ctx.fillText(noteLines[i], noteRight, y);
         y -= noteLineH;
