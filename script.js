@@ -1541,6 +1541,45 @@ async function ensureInviteFile() {
   }
 }
 
+// 複製到剪貼簿用的靜態 PNG：剪貼簿圖片格式幾乎只認 image/png，GIF 不能用，
+// 所以另外畫一張不會動的版本（flap 固定 0），跟下載用的動態 GIF 是兩回事。
+async function buildInvitePngBlob() {
+  const assets = await getInviteAssets();
+  const personalNote = inviteNote.value.trim();
+  const personalName = inviteName.value.trim();
+  const canvas = renderInviteCardDraft({
+    ...assets,
+    placeImage: invitePlaceImage,
+    personalNote,
+    personalName,
+    flap: 0,
+    pixelScale: 2,
+  });
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("PNG 轉檔失敗");
+  return blob;
+}
+
+// 電腦沒有手機的分享選單，但不少瀏覽器可以把圖片複製到剪貼簿，讓使用者直接在 LINE 裡貼上，
+// 不用自己去下載資料夾找檔案。clipboard.write() 這個呼叫本身要緊跟著使用者點擊、同步呼叫，
+// 不能先 await 別的事再呼叫，否則 Safari 這類瀏覽器會判定「不是使用者這次操作觸發的」而拒絕；
+// 圖真正畫好是晚一點的事，所以傳的是一個還沒 resolve 的 Promise，讓瀏覽器自己等。
+// 不支援、或寫入失敗就靜靜放棄，不影響原本「下載＋開 LINE」那條路。
+function copyInviteImageToClipboard() {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    return Promise.resolve(false);
+  }
+  try {
+    const item = new ClipboardItem({ "image/png": buildInvitePngBlob() });
+    return navigator.clipboard.write([item]).then(
+      () => true,
+      () => false
+    );
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
 function openInvite({ defaultNote = "", placeImg = null } = {}) {
   SFX.click();
   // 每次打開都換一組亂數 name／id，讓瀏覽器的自動完成沒辦法把這次的欄位
@@ -1636,6 +1675,9 @@ if (inviteBtn) {
   // 能做到的是：開啟 LINE 並帶入祝福文字，圖片用上面存好的那張，使用者自己在 LINE 裡附加。
   if (inviteLine) {
     inviteLine.addEventListener("click", async () => {
+      // 緊跟著這次點擊同步呼叫，圖晚一點畫好沒關係（見 copyInviteImageToClipboard 的說明）
+      const clipboardPromise = copyInviteImageToClipboard();
+
       let file;
       try {
         file = await ensureInviteFile();
@@ -1644,12 +1686,15 @@ if (inviteBtn) {
         return;
       }
       SFX.click();
+      const copied = await clipboardPromise;
       const note = inviteNote.value.trim();
       const name = inviteName.value.trim();
       const lines = [];
       if (note) lines.push(`「${note}」`);
       lines.push(name ? `—— ${name} 誠摯邀請你參加 2027寒修行` : "誠摯邀請你參加 2027寒修行");
-      lines.push("（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
+      lines.push(copied
+        ? "（圖片已經複製到剪貼簿，在 LINE 對話框按 Ctrl/Cmd+V 貼上就好！）"
+        : "（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
       window.open("https://line.me/R/msg/text/?" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
       if (window.showSaveFilePicker) {
         saveInviteAs(file);
