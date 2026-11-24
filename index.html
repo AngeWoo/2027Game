@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=64">
+<link rel="stylesheet" href="style.css?v=80">
 </head>
 <body>
 
@@ -32,7 +32,7 @@
 
 <header class="page-head">
   <h1><span class="grad-text">真如世界大冒險·GO</span></h1>
-  <p class="subtitle">將常住真身的救度慧燈，傳向立教百年</p>
+  <p class="subtitle">將常住真身之救度慧燈，傳承至立教百年</p>
 </header>
 
 <main class="stage">
@@ -60,6 +60,7 @@
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalName" tabindex="-1">
+    <button class="modal-x" id="modalX" aria-label="關閉">×</button>
     <div class="modal-place">
       <svg class="modal-plane" viewBox="0 0 72 40" aria-hidden="true">
         <g class="plane-trail" stroke="#e9a35c" stroke-width="2.4" stroke-linecap="round" fill="none">
@@ -116,6 +117,17 @@
         <circle cx="24" cy="24" r="21" fill="none" stroke="#b4783c" stroke-opacity=".65" stroke-width="1.2"/>
       </svg>
     </div>
+    <!-- 精舍小卡：照片＋國家洲別（資料在 temples.js；沒有照片的格子整塊隱藏） -->
+    <figure class="modal-temple" id="modalTemple" hidden>
+      <div class="modal-temple-photo">
+        <img id="modalTempleImg" alt="" decoding="async">
+      </div>
+      <figcaption>
+        <p class="modal-temple-meta" id="modalTempleMeta"></p>
+      </figcaption>
+    </figure>
+    <!-- 邀朋友：走到有地點的格子時，順勢邀人一起參加寒修行 -->
+    <button class="modal-invite-cta" id="modalInviteCta" type="button" hidden>💌 邀朋友一起出發</button>
     <div class="modal-icon" id="modalIcon">✨</div>
     <h2 class="modal-name" id="modalName">格子名稱</h2>
     <div class="modal-num" id="modalNum"></div>
@@ -139,7 +151,6 @@
       </div>
       <div class="omamori-pair">
         <img class="omamori-img" id="omamoriImg" alt="今日御守" decoding="async">
-        <img class="omamori-box-img" id="omamoriBoxImg" alt="同色御守盒" decoding="async" hidden>
       </div>
     </div>
     <figure class="omamori-word">
@@ -147,9 +158,9 @@
       <blockquote class="omamori-word-text" id="omamoriWordText"></blockquote>
       <figcaption class="omamori-word-by" id="omamoriWordBy"></figcaption>
     </figure>
-    <p class="omamori-note" id="omamoriNote">願這份守護，伴你把慧燈傳向立教百年。</p>
+    <p class="omamori-note" id="omamoriNote">將常住真身之救度慧燈，傳承至立教百年</p>
     <div class="omamori-actions">
-      <a class="omamori-save" id="omamoriSave" download aria-live="polite">⤓ 下載明信片圖檔</a>
+      <a class="omamori-save" id="omamoriSave" download aria-live="polite">⤓ 下載明信片</a>
       <button class="omamori-close" id="omamoriClose">收下御守</button>
     </div>
   </div>
@@ -185,11 +196,26 @@
   </div>
 </div>
 
+<!-- 地圖小視窗：點棋盤格子上的小圖示，看那個地點在 Google 地圖上的位置 -->
+<div class="map-overlay" id="mapOverlay">
+  <div class="map-card" id="mapCard" role="dialog" aria-modal="true" aria-labelledby="mapTitle" tabindex="-1">
+    <button class="map-x" id="mapX" aria-label="關閉">×</button>
+    <h3 class="map-title" id="mapTitle"></h3>
+    <div class="map-photo" id="mapPhoto" hidden>
+      <img id="mapPhotoImg" alt="" decoding="async">
+    </div>
+    <div class="map-frame-wrap">
+      <iframe class="map-frame" id="mapFrame" title="Google 地圖" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
+  </div>
+</div>
+
 <div class="confetti-layer" id="confettiLayer"></div>
 
 <script src="omamori-postcard.js?v=6"></script>
 <script src="gif.js?v=1"></script>
-<script src="invite-card-draft.js?v=13"></script>
-<script src="script.js?v=76"></script>
+<script src="invite-card-draft.js?v=16"></script>
+<script src="temples.js?v=1"></script>
+<script src="script.js?v=82"></script>
 </body>
 </html>

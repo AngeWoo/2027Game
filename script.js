@@ -221,11 +221,13 @@ const toastEl = document.getElementById("toast");
 const modalOverlay = document.getElementById("modalOverlay");
 const modalCard = document.getElementById("modalCard");
 const modalIcon = document.getElementById("modalIcon");
+const modalInviteCta = document.getElementById("modalInviteCta");
 const modalPlace = document.getElementById("modalPlace");
 const modalName = document.getElementById("modalName");
 const modalQuote = document.getElementById("modalQuote");
 const modalNum = document.getElementById("modalNum");
 const modalClose = document.getElementById("modalClose");
+const modalX = document.getElementById("modalX");
 const quizOverlay = document.getElementById("quizOverlay");
 const quizCard = document.getElementById("quizCard");
 const quizNo = document.getElementById("quizNo");
@@ -241,7 +243,6 @@ const omamoriCard = document.getElementById("omamoriCard");
 const omamoriNo = document.getElementById("omamoriNo");
 const omamoriStage = document.getElementById("omamoriStage");
 const omamoriImg = document.getElementById("omamoriImg");
-const omamoriBoxImg = document.getElementById("omamoriBoxImg");
 const omamoriClose = document.getElementById("omamoriClose");
 const omamoriSave = document.getElementById("omamoriSave");
 const omamoriX = document.getElementById("omamoriX");
@@ -319,10 +320,11 @@ function shuffle(arr) {
   return a;
 }
 
+// 地點資料庫在 temples.js（TEMPLE_LIST）。沒載入時（舊版頁面）退回下面這份簡易清單。
 // always on the board (日本 總本部 / 應現院, 東京都立川市)
 const TEMPLES_REQUIRED = ["真如苑總本部、真澄寺", "應現院"];
 // 全球真如苑 locations (Global Shinnyo-en map); the remaining regular tiles get a random pick
-const TEMPLES = [
+const TEMPLES_FALLBACK = [
   // 亞洲
   "真如苑台灣", "真如苑韓國", "真如苑香港", "真如苑泰國", "真如苑新加坡", "真如苑斯里蘭卡",
   // 歐洲
@@ -333,12 +335,64 @@ const TEMPLES = [
   "真如苑澳洲",
 ];
 
-// every page load: the required ones plus random others, placed in random order
+const MAX_PER_COUNTRY = 2; // 同一國最多幾格（美國、德國地點很多，避免整盤都是同一國）
+
+function templePool() {
+  if (typeof TEMPLE_LIST !== "undefined" && Array.isArray(TEMPLE_LIST) && TEMPLE_LIST.length) {
+    return TEMPLE_LIST.filter((t) => t.enabled !== false);
+  }
+  return [
+    ...TEMPLES_REQUIRED.map((name) => ({ name, short: name, required: true })),
+    ...TEMPLES_FALLBACK.map((name) => ({ name, short: name })),
+  ];
+}
+
+// every page load: the required ones, then one per continent, then random others —
+// placed in random order, so each game is a trip around the world
 function dealTemples() {
   const regular = TILES.filter((t) => t.type === "regular");
-  const others = shuffle(TEMPLES).slice(0, regular.length - TEMPLES_REQUIRED.length);
-  const names = shuffle([...TEMPLES_REQUIRED, ...others]);
-  regular.forEach((tile, i) => (tile.name = names[i]));
+  const pool = templePool();
+  const picked = pool.filter((t) => t.required).slice(0, regular.length);
+  const countryCount = {};
+  const take = (t) => {
+    picked.push(t);
+    if (t.country) countryCount[t.country] = (countryCount[t.country] || 0) + 1;
+  };
+  picked.forEach((t) => t.country && (countryCount[t.country] = (countryCount[t.country] || 0) + 1));
+  const free = () => pool.filter((t) => !picked.includes(t));
+
+  // 每一洲至少一格
+  const continents = shuffle([...new Set(pool.map((t) => t.continent).filter(Boolean))]);
+  for (const c of continents) {
+    if (picked.length >= regular.length) break;
+    if (picked.some((t) => t.continent === c)) continue;
+    const cand = shuffle(free().filter((t) => t.continent === c));
+    if (cand.length) take(cand[0]);
+  }
+  // 剩下的隨機補滿，同一國不超過 MAX_PER_COUNTRY；不夠時才放寬
+  for (const t of shuffle(free())) {
+    if (picked.length >= regular.length) break;
+    if (!t.country || (countryCount[t.country] || 0) < MAX_PER_COUNTRY) take(t);
+  }
+  for (const t of shuffle(free())) {
+    if (picked.length >= regular.length) break;
+    take(t);
+  }
+
+  shuffle(picked).forEach((t, i) => {
+    regular[i].name = t.short || t.name;
+    regular[i].fullName = t.name;
+    regular[i].place = t;
+  });
+}
+
+// 棋盤格名稱只在 <wbr> 處換行（CSS keep-all）：真如苑之後、括號前、頓號後、精舍／佈教所／本部之前
+function tileNameHtml(name) {
+  return name
+    .replace(/^真如苑(?=.)/, "真如苑<wbr>")
+    .replace(/(.)(?=[(（])/, "$1<wbr>")
+    .replace("、", "、<wbr>")
+    .replace(/(.)(佈教所|精舍|本部)$/, "$1<wbr>$2");
 }
 
 // ---------- build board ----------
@@ -355,10 +409,11 @@ function buildBoard() {
     el.style.gridColumn = col;
     el.innerHTML = `
       <div class="tile-icon">${tile.icon}</div>
-      <div class="tile-name">${tile.name.replace(/^真如苑/, "真如苑<wbr>").replace("(", "<wbr>(").replace("、", "、<wbr>")}</div>
+      <div class="tile-name">${tileNameHtml(tile.name)}</div>
     `;
     boardEl.insertBefore(el, centerPanel);
     tileEls.push(el);
+    if (tile.place) wireTileMapIcon(el, tile);
   });
 }
 
@@ -709,14 +764,177 @@ const LAND_SOUND = {
   regular: () => SFX.landRegular(),
 };
 
+// ---------- 精舍小卡（照片＋國家洲別，資料在 temples.js） ----------
+const modalTemple = document.getElementById("modalTemple");
+const modalTempleImg = document.getElementById("modalTempleImg");
+const modalTempleMeta = document.getElementById("modalTempleMeta");
+const templeImgCache = new Map();
+
+// 棋子還在走的時候先把落點的照片抓下來，彈窗打開就不用等
+function preloadTemple(tile) {
+  const src = tile && tile.place && tile.place.img;
+  if (!src || templeImgCache.has(src)) return;
+  const img = new Image();
+  img.decoding = "async";
+  img.src = src;
+  templeImgCache.set(src, img);
+}
+
+function showTemple(tile) {
+  const place = tile.type === "regular" ? tile.place : null;
+  if (!modalTemple) return;
+  if (!place || !place.img) {
+    modalTemple.hidden = true;
+    modalCard.classList.remove("has-temple");
+    return;
+  }
+  modalTemple.hidden = false;
+  modalCard.classList.add("has-temple");
+  modalTempleImg.classList.remove("loaded");
+  modalTempleImg.onload = () => modalTempleImg.classList.add("loaded");
+  modalTempleImg.onerror = () => {
+    modalTemple.hidden = true;
+    modalCard.classList.remove("has-temple");
+  };
+  modalTempleImg.alt = place.name;
+  modalTempleImg.src = place.img;
+  if (modalTempleImg.complete && modalTempleImg.naturalWidth) modalTempleImg.classList.add("loaded");
+
+  // 不放國旗 emoji：Windows 不支援，會顯示成「KE」這種字母
+  modalTempleMeta.textContent = "📍 " + [place.country, place.continent].filter(Boolean).join("・");
+  fitModal();
+  setTimeout(fitModal, 400);
+}
+
+// 卡片內容比畫面高時，把照片縮矮（最矮 90px），讓整張卡片不用捲動
+const PHOTO_MIN = 90;
+function fitModal() {
+  const photo = modalTemple && !modalTemple.hidden ? modalTemple.querySelector(".modal-temple-photo") : null;
+  if (!photo) return;
+  photo.style.height = "";
+  photo.style.aspectRatio = "";
+  // 照片在左、文字在右的寬螢幕排法不縮，照片高度跟著文字走
+  const over = modalCard.scrollHeight - modalCard.clientHeight;
+  if (over > 0 && !modalCard.classList.contains("temple-wide")) {
+    photo.style.aspectRatio = "auto";
+    photo.style.height = `${Math.max(PHOTO_MIN, photo.offsetHeight - over - 2)}px`;
+  }
+}
+// 矮又寬的螢幕（筆電橫放）：照片放左邊、文字放右邊，省下垂直空間
+const templeWideMQ = window.matchMedia("(max-height: 760px) and (min-width: 700px)");
+function applyTempleWide() {
+  modalCard.classList.toggle("temple-wide", templeWideMQ.matches);
+}
+applyTempleWide();
+templeWideMQ.addEventListener("change", () => {
+  applyTempleWide();
+  fitModal();
+});
+
+// 彈窗標題：只在「真如苑／精舍／佈教所」等詞的邊界換行；括號內的地區縮小放第二行
+function setPlaceName(full) {
+  const m = full.match(/^(.*?)[（(]([^）)]*)[）)]$/);
+  const main = m ? m[1] : full;
+  const parts = main
+    .replace(/^真如苑(?=.)/, "真如苑\u0000")
+    .replace(/、/g, "、\u0000")
+    .replace(/(.)(佈教所|精舍|本部|中心)/g, "$1\u0000$2")
+    .split("\u0000");
+  const nodes = [];
+  parts.forEach((p, i) => {
+    if (i) nodes.push(document.createElement("wbr"));
+    nodes.push(document.createTextNode(p));
+  });
+  if (m) nodes.push(Object.assign(document.createElement("span"), { className: "modal-place-sub", textContent: m[2] }));
+  modalPlace.replaceChildren(...nodes);
+}
+
+// ---------- 地圖小視窗：點棋盤格子上的小圖示，看 Google 地圖上的位置 ----------
+const mapOverlay = document.getElementById("mapOverlay");
+const mapCard = document.getElementById("mapCard");
+const mapTitle = document.getElementById("mapTitle");
+const mapPhoto = document.getElementById("mapPhoto");
+const mapPhotoImg = document.getElementById("mapPhotoImg");
+const mapFrame = document.getElementById("mapFrame");
+const mapX = document.getElementById("mapX");
+
+function placeMapQuery(place) {
+  return [place.name, place.country].filter(Boolean).join(" ");
+}
+
+function openPlaceMap(place) {
+  if (!mapOverlay || !place) return;
+  mapTitle.textContent = place.name;
+  // 照片跟「精舍小卡」共用同一張圖（temples.js），不需要另外申請 Google 的付費圖片 API
+  if (place.img) {
+    mapPhotoImg.onerror = () => { mapPhoto.hidden = true; };
+    mapPhotoImg.alt = place.name;
+    mapPhotoImg.src = place.img;
+    mapPhoto.hidden = false;
+  } else {
+    mapPhoto.hidden = true;
+  }
+  mapFrame.src = `https://www.google.com/maps?q=${encodeURIComponent(placeMapQuery(place))}&output=embed`;
+  mapOverlay.classList.add("show");
+  dialogOpened(mapCard, mapX);
+  SFX.click();
+}
+
+function closePlaceMap() {
+  mapOverlay.classList.remove("show");
+  mapFrame.src = ""; // 關閉時清空，背景分頁就不會一直耗流量
+  dialogsClosed();
+}
+
+if (mapOverlay) {
+  mapX.addEventListener("click", closePlaceMap);
+  mapOverlay.addEventListener("click", (e) => {
+    if (e.target === mapOverlay) closePlaceMap();
+  });
+}
+
+// 棋盤格子上的小圖示：點下去看那個地點在 Google 地圖上的位置（跟擲骰子、走格子是各自獨立的）
+function wireTileMapIcon(el, tile) {
+  const icon = el.querySelector(".tile-icon");
+  if (!icon) return;
+  icon.classList.add("tile-icon-mappable");
+  icon.setAttribute("role", "button");
+  icon.setAttribute("tabindex", "0");
+  icon.setAttribute("aria-label", `在 Google 地圖查看「${tile.place.name}」`);
+  const open = (e) => {
+    e.stopPropagation();
+    openPlaceMap(tile.place);
+  };
+  icon.addEventListener("click", open);
+  icon.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      open(e);
+    }
+  });
+}
+
+let currentModalTile = null; // 目前今日實踐視窗顯示的格子，給「邀朋友」關掉邀請函後回來用
+
 function openModal(tile) {
+  currentModalTile = tile;
   const isLuck = tile.type === "chance" || tile.type === "fate";
   const q = isLuck ? parseWt(pickFrom(WT)) : parseYuange(pickFrom(YUANGE));
   modalIcon.innerHTML = tile.icon;
-  modalPlace.textContent = tile.name;
+  setPlaceName(tile.fullName || tile.name);
+  showTemple(tile);
+  if (modalInviteCta) {
+    if (tile.place) {
+      modalInviteCta.hidden = false;
+      modalInviteCta.textContent = `💌 邀朋友從${tile.place.country}一起出發，參加2027年寒修行`;
+    } else {
+      modalInviteCta.hidden = true;
+    }
+  }
   modalName.textContent = q.source || (isLuck ? tile.name : "今日實踐");
   modalNum.textContent = q.num ? `《${q.num}》` : "";
   modalQuote.textContent = q.text || tile.quote;
+  fitModal(); // 文字都放好之後再量一次高度
   afterModal = true; // 每一格關閉後都接一個小視窗（機會／命運也含在內）
   modalOverlay.classList.add("show");
   dialogOpened(modalCard, modalClose);
@@ -755,6 +973,7 @@ function endTurn() {
 }
 
 modalClose.addEventListener("click", closeModal);
+if (modalX) modalX.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", (e) => {
   if (e.target === modalOverlay) closeModal();
 });
@@ -978,32 +1197,9 @@ if (quizOverlay) {
 }
 
 // ---------- 今日御守小視窗 ----------
-// 圖片放在同資料夾的 1122 底下，五款顏色各一張。
+// 圖片放在同資料夾的「御守」底下，一共 20 張，每張圖上都已經印好法語和署名。
 // 之後要增減御守，改這張清單就好，其他地方都不用動。
-const OMAMORI = {
-  dir: "1122",
-  // webp 是用同資料夾的原始 png 壓出來的：一樣 1086x1448，但一張只有
-  // 2 百多 KB（原始 png 約 2 MB），供畫面顯示和明信片合成使用。
-  ext: ".webp",
-  names: [
-    "omamori-red-transparent",
-    "omamori-gold-transparent",
-    "omamori-green-transparent",
-    "omamori-purple-transparent",
-    "omamori-orange-transparent",
-  ],
-};
-
-function omamoriPaths() {
-  return OMAMORI.names.map((name) => encodeURI(OMAMORI.dir + "/" + name + OMAMORI.ext) + "?v=1");
-}
-
-function omamoriBoxPath(src) {
-  const file = src.slice(src.lastIndexOf("/") + 1)
-    .replace("omamori-", "omamori-box-")
-    .replace(/\.webp(?=\?|$)/, ".png");
-  return encodeURI("御守盒/") + file;
-}
+const OMAMORI_DIR = "御守";
 
 function loadOmamoriImage(src) {
   return new Promise((resolve) => {
@@ -1031,43 +1227,44 @@ const OMAMORI_WORDS = [
   { text: "「燈明是，滅己身給予人們光明」。可是一旦要去做時，卻並非那麼容易。犧牲自己，感謝讓自己成為眾人的基石，就是完全成為燈明。", by: "攝受心院 師父" },
 ];
 
-const OMAMORI_PATHS = omamoriPaths();
+// 每張御守圖上都已經印好其中一句法語，這裡記著「哪張圖配哪句話」（對照 OMAMORI_WORDS 的索引），
+// 存檔案名、下載明信片時都照這份對照表走，圖和字永遠一致。
+const OMAMORI_FILES = [
+  ["44884AD1-F26B-47BB-B19C-CB5832B3BE04.png", 0],
+  ["E9A65113-3B8C-418D-9D75-CEC95AE80B53.png", 0],
+  ["91A0044D-6A21-46BE-B200-2ABF3601197D.png", 1],
+  ["C0F00D28-13E0-4749-B3AD-353CC4A464FA.png", 1],
+  ["2B3F45F5-C805-46E4-96C1-1EB90865DD17.png", 2],
+  ["F742BC86-624F-4421-AC89-5F5D2A33EB2C.png", 2],
+  ["0BFF62B2-F26D-4515-BEE7-F827F44A291F.png", 3],
+  ["0559612C-B62B-4557-A47E-F804E1382B8D.png", 4],
+  ["873027D8-2F2E-4490-B819-360732C6E08B.png", 4],
+  ["A8505736-5080-4749-986C-8989D4141CF7.png", 5],
+  ["7210F157-CB7E-4AD2-92E8-360E1860DAF5.png", 6],
+  ["69CECE95-61F9-46DC-87B8-D2DDB8D0A6C1.png", 6],
+  ["D66FFC78-0558-4400-893A-CFA387C54E73.png", 6],
+  ["620C8471-42EA-471D-A252-32547D665CD6.png", 7],
+  ["C18B1673-29BF-4006-9895-C839ACCB9171.png", 7],
+  ["0864D3C0-1E5E-4DAC-8B07-5C48679E2B09.png", 8],
+  ["E99A9EE6-A6B1-4B7C-A352-7479DC26AB88.png", 8],
+  ["35FCCFA6-8E1B-41E5-AB5E-404B809022F0.png", 9],
+  ["D98B82BF-3B0B-4FCC-955A-D2DBFFABE969.png", 9],
+  ["080024A9-D3A1-47D7-80C7-E3D889E1D733.png", 10],
+];
 
-// 法語用洗牌袋，十一句講完才重頭，不會連著兩次抽到同一句
-const OMAMORI_WORD_POOL = {
-  all: OMAMORI_WORDS.slice(),
-  bag: [],
-  last: null,
-};
+const OMAMORI_ENTRIES = OMAMORI_FILES.map(([file, wordIndex]) => ({
+  src: encodeURI(OMAMORI_DIR + "/" + file) + "?v=1",
+  word: OMAMORI_WORDS[wordIndex],
+}));
 
-function shuffleInto(pool) {
-  const bag = pool.all.slice();
-  for (let i = bag.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [bag[i], bag[j]] = [bag[j], bag[i]];
-  }
-  // 新的一輪，第一個別跟上一輪的最後一個撞在一起
-  if (bag.length > 1 && bag[bag.length - 1] === pool.last) {
-    [bag[bag.length - 1], bag[0]] = [bag[0], bag[bag.length - 1]];
-  }
-  pool.bag = bag;
-}
-
-function drawOmamoriWord() {
-  if (!OMAMORI_WORD_POOL.all.length) return null;
-  if (!OMAMORI_WORD_POOL.bag.length) shuffleInto(OMAMORI_WORD_POOL);
-  const word = OMAMORI_WORD_POOL.bag.pop();
-  OMAMORI_WORD_POOL.last = word;
-  return word;
-}
-
+// 亂數抽一張（跟洗牌一樣，不特別避免連續抽到同一張）
 function drawOmamori() {
-  return shuffle(OMAMORI_PATHS)[0] ?? "";
+  return shuffle(OMAMORI_ENTRIES)[0] ?? null;
 }
 
 // 存到手機／電腦裡時的檔名：用整組御守裡的編號，一看就知道是第幾張
 function omamoriFileName(src) {
-  const i = OMAMORI_PATHS.indexOf(src);
+  const i = OMAMORI_ENTRIES.findIndex((entry) => entry.src === src);
   const no = String(i >= 0 ? i + 1 : 0).padStart(2, "0");
   return `真如世界大冒險·GO_御守明信片_${no}.png`;
 }
@@ -1098,7 +1295,7 @@ function setOmamoriDownload(file, date, render) {
   clearOmamoriDownload();
   omamoriSave.href = URL.createObjectURL(file);
   omamoriSave.download = file.name;
-  omamoriSave.textContent = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載明信片圖檔";
+  omamoriSave.textContent = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載明信片";
   omamoriDownload = { file, date, render };
 }
 
@@ -1199,41 +1396,31 @@ if (omamoriSave) {
 
 let omamoriServed = 0; // 這次開啟頁面已經領了幾張
 async function openOmamori() {
-  const src = drawOmamori();
-  if (!src) {
+  const entry = drawOmamori();
+  if (!entry) {
     endTurn();
     return;
   }
+  const { src, word } = entry;
 
   omamoriServed += 1;
   const drawNumber = omamoriServed;
   omamoriNo.textContent = "本次第 " + omamoriServed + " 張";
 
-  // 法語先放好，等御守落定時再一起亮出來
-  const word = drawOmamoriWord();
+  // 法語先放好，等御守落定時再一起亮出來（圖上印的就是這句話）
   if (omamoriWordText) omamoriWordText.textContent = word ? word.text : "";
   if (omamoriWordBy) omamoriWordBy.textContent = word ? word.by : "";
-  omamoriStage.classList.remove("revealed", "has-box"); // 先收起來，等圖到了才由上往下降
+  omamoriStage.classList.remove("revealed"); // 先收起來，等圖到了才由上往下降
   omamoriImg.removeAttribute("src");
-  omamoriBoxImg.hidden = true;
-  omamoriBoxImg.removeAttribute("src");
   clearOmamoriDownload();
   omamoriSave.textContent = "明信片製作中…";
   omamoriOverlay.classList.add("show");
   dialogOpened(omamoriCard, omamoriClose);
 
-  const [image, box] = await Promise.all([
-    loadOmamoriImage(src),
-    loadOmamoriImage(omamoriBoxPath(src)),
-  ]);
+  const image = await loadOmamoriImage(src);
   if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
 
   omamoriImg.src = src;
-  if (box) {
-    omamoriBoxImg.src = box.src;
-    omamoriBoxImg.hidden = false;
-    omamoriStage.classList.add("has-box");
-  }
 
   requestAnimationFrame(() => {
     if (drawNumber !== omamoriServed || !omamoriOverlay.classList.contains("show")) return;
@@ -1241,7 +1428,7 @@ async function openOmamori() {
     SFX.omamori();
     bumpCounter("omamori");
     if (image) {
-      prepareOmamoriFile(image, box, src, word, drawNumber);
+      prepareOmamoriFile(image, null, src, word, drawNumber);
     } else {
       omamoriSave.textContent = "無法載入御守圖檔";
     }
@@ -1273,6 +1460,7 @@ if (omamoriOverlay) {
 // 越打越卡，看起來就像字打不進去、被吃掉。改成只有在按下「下載」／「用 LINE 傳送」
 // 那一刻才真正開始做圖，輸入框全程不受任何背景工作干擾。
 let inviteAssets = null; // 毛筆字圖＋QR code，只載入一次
+let invitePlaceImage = null; // 從「邀朋友」按鈕帶過來的當地照片，每次打開都可能不一樣，不能跟上面那份共用快取
 let inviteFile = null; // 目前已經做好、可以直接用的 GIF 檔
 let inviteDirty = true; // 文字改過、還沒重做 GIF
 let inviteBuildToken = 0; // 每次做 GIF +1，讓做到一半又被取代的結果自動作廢
@@ -1297,7 +1485,7 @@ function drawInvitePreviewOnce() {
   if (!inviteAssets) return;
   const personalNote = inviteNote.value.trim();
   const personalName = inviteName.value.trim();
-  const canvas = renderInviteCardDraft({ ...inviteAssets, personalNote, personalName, flap: 0, pixelScale: 1 });
+  const canvas = renderInviteCardDraft({ ...inviteAssets, placeImage: invitePlaceImage, personalNote, personalName, flap: 0, pixelScale: 1 });
   const pctx = invitePreview.getContext("2d");
   pctx.clearRect(0, 0, invitePreview.width, invitePreview.height);
   pctx.drawImage(canvas, 0, 0, invitePreview.width, invitePreview.height);
@@ -1342,7 +1530,7 @@ async function ensureInviteFile() {
     const assets = await getInviteAssets();
     const personalNote = inviteNote.value.trim();
     const personalName = inviteName.value.trim();
-    const blob = await buildInviteGif({ ...assets, personalNote, personalName });
+    const blob = await buildInviteGif({ ...assets, placeImage: invitePlaceImage, personalNote, personalName });
     if (token !== inviteBuildToken) return inviteFile; // 這份還沒做完，使用者又點了一次，用最新那份就好
     inviteFile = new File([blob], inviteFileName(personalName), { type: "image/gif" });
     inviteDirty = false;
@@ -1353,34 +1541,62 @@ async function ensureInviteFile() {
   }
 }
 
-function openInvite() {
+function openInvite({ defaultNote = "", placeImg = null } = {}) {
   SFX.click();
   // 每次打開都換一組亂數 name／id，讓瀏覽器的自動完成沒辦法把這次的欄位
   // 跟之前任何一次測試對上號、生出下拉建議——這是這類問題最常見的成因。
   const rnd = Math.random().toString(36).slice(2, 10);
   inviteNote.name = `inviteNote_${rnd}`;
   inviteName.name = `inviteName_${rnd}`;
-  inviteNote.value = "";
+  inviteNote.value = defaultNote;
   inviteName.value = "";
   inviteDirty = true;
+  invitePlaceImage = null; // 先清掉上一次的照片，等這次的（如果有）載完再換上
   inviteOverlay.classList.add("show");
   dialogOpened(inviteCard, inviteNote);
   syncInviteButtonLabel();
   getInviteAssets().then(() => {
     if (inviteOverlay.classList.contains("show")) drawInvitePreviewOnce();
   });
+  if (placeImg) {
+    loadOmamoriImage(placeImg).then((image) => {
+      invitePlaceImage = image;
+      inviteDirty = true;
+      if (inviteOverlay.classList.contains("show")) drawInvitePreviewOnce();
+    });
+  }
 }
+
+// 從「今日實踐」視窗的「邀朋友」按鈕打開邀請函時，記著要回去的那張小卡
+let inviteReturnTile = null;
 
 function closeInvite() {
   inviteOverlay.classList.remove("show");
   SFX.click();
   clearTimeout(invitePreviewTimer);
-  dialogsClosed();
-  inviteBtn.focus({ preventScroll: true });
+  if (inviteReturnTile) {
+    inviteReturnTile = null;
+    modalOverlay.classList.add("show");
+    dialogOpened(modalCard, modalClose);
+  } else {
+    dialogsClosed();
+    inviteBtn.focus({ preventScroll: true });
+  }
+}
+
+if (modalInviteCta) {
+  modalInviteCta.addEventListener("click", () => {
+    inviteReturnTile = currentModalTile;
+    modalOverlay.classList.remove("show");
+    openInvite({
+      defaultNote: `剛走到了${inviteReturnTile.place.country}，一起參加2027年寒修行吧！`,
+      placeImg: inviteReturnTile.place.img,
+    });
+  });
 }
 
 if (inviteBtn) {
-  inviteBtn.addEventListener("click", openInvite);
+  inviteBtn.addEventListener("click", () => openInvite());
   inviteX.addEventListener("click", closeInvite);
   inviteOverlay.addEventListener("click", (e) => {
     if (e.target === inviteOverlay) closeInvite(); // 和其他視窗一樣：點背景就關
@@ -1465,17 +1681,20 @@ document.addEventListener("keydown", (e) => {
   const inviteOpen = !!inviteOverlay && inviteOverlay.classList.contains("show");
   const omamoriOpen = !!omamoriOverlay && omamoriOverlay.classList.contains("show");
   const quizOpen = !!quizOverlay && quizOverlay.classList.contains("show");
+  const mapOpen = !!mapOverlay && mapOverlay.classList.contains("show");
   const modalOpen = modalOverlay.classList.contains("show");
   if (e.key === "Escape") {
     if (inviteOpen) closeInvite();
     else if (omamoriOpen) closeOmamori();
     else if (quizOpen) closeQuiz();
+    else if (mapOpen) closePlaceMap();
     else if (modalOpen) closeModal();
     return;
   }
   if (inviteOpen) trapTab(e, inviteCard);
   else if (omamoriOpen) trapTab(e, omamoriCard);
   else if (quizOpen) trapTab(e, quizCard);
+  else if (mapOpen) trapTab(e, mapCard);
   else if (modalOpen) trapTab(e, modalCard);
 });
 
@@ -1801,6 +2020,7 @@ async function handleRoll() {
 
   const values = Array.from({ length: DICE_COUNT }, () => 1 + Math.floor(Math.random() * 6));
   const roll = values.reduce((a, b) => a + b, 0);
+  preloadTemple(TILES[(position + roll) % TILE_COUNT]);
 
   await rollDiceAnimation(values);
   await delay(150);

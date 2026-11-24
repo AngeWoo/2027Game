@@ -25,6 +25,17 @@ function loadInviteQrImage(src = "invite-qr.png") {
   });
 }
 
+// 圓角矩形路徑：用 arcTo 手刻，不依賴 ctx.roundRect（舊版 Safari 還沒有）
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 function renderInviteCardDraft(opts = {}) {
   const {
     eyebrow = "誠摯邀請",
@@ -45,6 +56,7 @@ function renderInviteCardDraft(opts = {}) {
     titleFont = '"Long Cang"',
     titleImage = null, // 去背後的「寒修行」毛筆字圖檔（loadInviteTitleImage 的結果）
     qrImage = null, // 真正的 QR code 圖檔（loadInviteQrImage 的結果），沒給就畫占位框
+    placeImage = null, // 從「今日實踐」小卡帶過來的當地照片，縮小貼在右上角；沒有就不畫
     personalNote = "", // 發送者自己打的話，放在印章上方的空白處
     personalName = "", // 發送者的名字，簽在那句話下面
     flap = 0, // 仙鶴拍翅膀的動畫進度（一圈＝1），GIF 每一幀給不同的值
@@ -89,6 +101,32 @@ function renderInviteCardDraft(opts = {}) {
   ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+
+  // ---------- 當地照片：像隨手別上去的一張小照片，貼在右上角，仙鶴從它前面飛過 ----------
+  if (placeImage && placeImage.naturalWidth) {
+    const photoW = 112, photoH = 82;
+    const photoX = W - 72 - photoW;
+    const photoY = 30;
+    ctx.save();
+    ctx.translate(photoX + photoW / 2, photoY + photoH / 2);
+    ctx.rotate(Math.PI / 44); // 歪一點點，像剛別上去，不是印刷品
+    ctx.translate(-photoW / 2, -photoH / 2);
+    ctx.shadowColor = "rgba(46, 42, 38, 0.32)";
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = "#fdf8ee";
+    roundRectPath(ctx, -4, -4, photoW + 8, photoH + 8, 9);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    roundRectPath(ctx, 0, 0, photoW, photoH, 7);
+    ctx.save();
+    ctx.clip();
+    const scale = Math.max(photoW / placeImage.naturalWidth, photoH / placeImage.naturalHeight);
+    const dw = placeImage.naturalWidth * scale, dh = placeImage.naturalHeight * scale;
+    ctx.drawImage(placeImage, (photoW - dw) / 2, (photoH - dh) / 2, dw, dh);
+    ctx.restore();
+    ctx.restore();
+  }
 
   // ---------- 仙鶴（簡筆，兩隻，翅膀會拍）----------
   // wingPhase 0→1 是一整圈拍翅：sin 讓翅尖和翅膀頂點一起上下擺，看起來才像飛
@@ -265,7 +303,7 @@ function renderInviteCardDraft(opts = {}) {
 
   // ---------- 時間表：開白／中願／結願，橫排三段，中間用細線隔開 ----------
   const schedTop = bodyTop + (bodyLines.length - 1) * lineHeight + 56;
-  const schedDateY = schedTop + 24;
+  const schedDateY = schedTop + 29;
   const schedColW = (W - textX * 2) / schedule.length;
   schedule.forEach((item, i) => {
     const segX = textX + i * schedColW;
@@ -273,21 +311,21 @@ function renderInviteCardDraft(opts = {}) {
       ctx.strokeStyle = "rgba(138, 90, 30, 0.3)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(segX - 20, schedTop - 18);
-      ctx.lineTo(segX - 20, schedDateY + 8);
+      ctx.moveTo(segX - 20, schedTop - 22);
+      ctx.lineTo(segX - 20, schedDateY + 10);
       ctx.stroke();
     }
     ctx.fillStyle = goldDeep;
-    ctx.font = `bold 17px ${sans}`;
+    ctx.font = `bold 22px ${sans}`;
     ctx.fillText(item.phase, segX, schedTop);
     ctx.fillStyle = "#4a3f33";
-    ctx.font = `15px ${sans}`;
+    ctx.font = `19px ${sans}`;
     ctx.fillText(item.range, segX, schedDateY);
   });
 
   // ---------- 印章（敬邀）：沿用明信片雙圈郵戳的做法，改暖色 ----------
   ctx.save();
-  ctx.translate(770, (bodyTop + schedDateY) / 2 + 6);
+  ctx.translate(812, (bodyTop + schedDateY) / 2 + 6);
   ctx.rotate(-Math.PI / 24);
   ctx.strokeStyle = "rgba(168, 54, 44, 0.82)";
   ctx.fillStyle = ctx.strokeStyle;

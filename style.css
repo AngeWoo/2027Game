@@ -307,6 +307,21 @@ body {
   font-size: clamp(13px, 3.4cqw, 30px);
   line-height: 1;
 }
+/* 有配到地點的格子：小圖示可以點，看那個地方在 Google 地圖上的位置 */
+.tile .tile-icon.tile-icon-mappable {
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.tile .tile-icon.tile-icon-mappable:hover,
+.tile .tile-icon.tile-icon-mappable:focus-visible {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 0.3em rgba(var(--gold-rgb), 0.9));
+}
+.tile .tile-icon.tile-icon-mappable:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 
 /* sun / moon / star symbols */
 .sym {
@@ -683,10 +698,15 @@ body {
 }
 
 .modal-card {
+  --pad-top: clamp(28px, 6vw, 48px);
+  --pad-x: clamp(20px, 5vw, 44px);
+  position: relative;
   width: min(92vw, 580px);
   max-height: 90vh;
   overflow-y: auto;
-  padding: clamp(28px, 6vw, 48px) clamp(20px, 5vw, 44px) clamp(24px, 5vw, 40px);
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* 不顯示捲軸；內容會由 fitModal() 縮照片塞進畫面 */
+  padding: var(--pad-top) var(--pad-x) clamp(24px, 5vw, 40px);
   border-radius: 28px;
   text-align: center;
   background:
@@ -722,6 +742,7 @@ body {
   justify-content: center;
   gap: clamp(8px, 2vw, 16px);
   margin-bottom: clamp(12px, 3vw, 22px);
+  padding-right: 36px; /* 避開右上角的關閉鈕，名稱換成兩行時才不會疊到 */
   font-size: clamp(26px, 7vw, 40px);
   font-weight: 800;
   line-height: 1.25;
@@ -732,6 +753,15 @@ body {
   min-width: 0;
   text-align: center;
   text-wrap: balance;
+  word-break: keep-all; /* 只在 <wbr> 處換行，不會切成「墨西／哥」 */
+}
+/* 括號裡的地區（例如「法國巴黎」）縮小放第二行 */
+.modal-place-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.55em;
+  letter-spacing: 1px;
+  color: var(--gold);
 }
 .modal-plane {
   flex: none;
@@ -818,6 +848,90 @@ body {
   .modal-overlay.show .modal-globe { animation: none; }
 }
 
+/* 精舍小卡：照片＋國家洲別 */
+.modal-temple {
+  margin: 0 0 clamp(14px, 3vw, 22px);
+  text-align: left;
+}
+.modal-temple[hidden] { display: none; }
+.modal-temple-photo {
+  aspect-ratio: 4 / 3;
+  max-height: 34vh;
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(var(--accent-3-rgb), 0.16);
+  box-shadow: 0 10px 24px rgba(var(--shadow-rgb), 0.22);
+  border: 3px solid #fffaf2;
+}
+.modal-temple-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.modal-temple-photo img.loaded { opacity: 1; }
+.modal-temple-meta {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: clamp(14px, 3.6vw, 17px);
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+
+/* 邀朋友：比「繼續前進」低調的次要按鈕，走到有地點的格子才會出現 */
+.modal-invite-cta {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: clamp(10px, 2.5vw, 16px) auto 0;
+  padding: 8px 20px;
+  border: 1.5px solid rgba(var(--gold-rgb), 0.5);
+  border-radius: 999px;
+  background: rgba(255, 250, 242, 0.7);
+  color: var(--gold);
+  font-size: clamp(13px, 3.3vw, 15px);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.modal-invite-cta:hover { background: #fff; transform: translateY(-1px); }
+.modal-invite-cta[hidden] { display: none; }
+
+/* 有照片時，照片取代大圖示，其他間距收緊，讓整張卡片不必捲動 */
+.modal-card::-webkit-scrollbar { display: none; }
+.modal-card.has-temple { --pad-top: clamp(20px, 4vw, 34px); }
+.modal-card.has-temple .modal-icon { display: none; }
+.modal-card.has-temple .modal-place {
+  font-size: clamp(22px, 5.6vw, 34px);
+  margin-bottom: clamp(8px, 2vw, 14px);
+}
+.modal-card.has-temple .modal-name { margin-bottom: 8px; font-size: clamp(20px, 5vw, 28px); }
+.modal-card.has-temple .modal-quote { margin-bottom: clamp(14px, 3vw, 24px); line-height: 1.6; }
+
+/* 矮又寬的螢幕：卡片加寬，照片在左、國家在右 */
+.modal-card.temple-wide.has-temple {
+  width: min(94vw, 860px);
+  max-height: 94vh;
+  --pad-top: 18px;
+}
+.modal-card.temple-wide .modal-temple {
+  display: grid;
+  grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+.modal-card.temple-wide .modal-temple-photo { max-height: 52vh; }
+.modal-card.temple-wide .modal-temple-meta { margin-top: 0; }
+.modal-card.temple-wide.has-temple .modal-place { margin-bottom: 8px; }
+.modal-card.temple-wide.has-temple .modal-plane,
+.modal-card.temple-wide.has-temple .modal-globe { width: 1.4em; }
+
 .modal-name {
   margin: 0 0 18px;
   font-size: clamp(22px, 5.5vw, 32px);
@@ -854,6 +968,23 @@ body {
   transition: transform 0.15s ease;
 }
 .modal-close:hover { transform: translateY(-2px); }
+
+.modal-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 253, 248, 0.8);
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.modal-x:hover { background: #fff; color: var(--text); }
 
 /* ---------- confetti ---------- */
 .confetti-layer {
@@ -929,14 +1060,115 @@ body {
 .roll-btn:focus-visible,
 .sound-toggle:focus-visible,
 .modal-close:focus-visible,
+.modal-x:focus-visible,
+.modal-invite-cta:focus-visible,
 .quiz-opt:focus-visible,
 .quiz-close:focus-visible,
-.quiz-x:focus-visible {
+.quiz-x:focus-visible,
+.map-x:focus-visible {
   outline: 3px solid var(--accent-1);
   outline-offset: 3px;
 }
 .modal-card:focus,
-.quiz-card:focus { outline: none; }
+.quiz-card:focus,
+.map-card:focus { outline: none; }
+
+/* ---------- 地圖小視窗：點棋盤格子小圖示，看 Google 地圖上的位置 ---------- */
+.map-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 44, 24, 0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.map-overlay.show { opacity: 1; pointer-events: auto; }
+
+.map-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(92vw, 640px);
+  /* 用視窗實際高度（dvh）算，手機網址列伸縮也不會算錯；不支援的瀏覽器退回 vh */
+  height: min(84vh, 640px);
+  height: min(84dvh, 640px);
+  padding: clamp(12px, 3vw, 24px);
+  border-radius: 24px;
+  background: linear-gradient(165deg, #fffbf4, #ffeedb);
+  border: 1px solid rgba(var(--warm-ink-rgb), 0.2);
+  box-shadow: 0 26px 70px rgba(var(--shadow-rgb), 0.32), 0 0 60px rgba(var(--accent-1-rgb), 0.1);
+  overflow: hidden; /* 內容一定會縮進這個高度，不需要再捲動 */
+  transform: scale(0.82) translateY(24px);
+  opacity: 0;
+  transition: transform 0.32s cubic-bezier(.34,1.56,.64,1), opacity 0.26s ease;
+}
+.map-overlay.show .map-card { transform: scale(1) translateY(0); opacity: 1; }
+
+.map-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-dim);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.map-x:hover { background: #fff; color: var(--text); }
+
+.map-title {
+  flex: none;
+  margin: 0 0 clamp(8px, 2vw, 14px);
+  padding-right: 30px;
+  font-size: clamp(14px, 3.6vw, 20px);
+  font-weight: 800;
+  color: var(--gold);
+  text-align: center;
+}
+/* 照片和地圖分掉標題以外的高度（照片約 38%、地圖約 62%），縮放視窗時一起縮小，不會爆版 */
+.map-photo {
+  flex: 38 38 0;
+  min-height: 0;
+  width: 100%;
+  margin: 0 0 clamp(8px, 2vw, 12px);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(var(--accent-3-rgb), 0.16);
+  box-shadow: 0 8px 20px rgba(var(--shadow-rgb), 0.2);
+}
+.map-photo[hidden] { display: none; }
+.map-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.map-frame-wrap {
+  flex: 62 62 0;
+  min-height: 0;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(var(--accent-3-rgb), 0.12);
+}
+/* 沒有照片時，地圖獨吞剩下的高度 */
+.map-photo[hidden] ~ .map-frame-wrap { flex: 1 1 auto; }
+.map-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
 
 /* ---------- 寒修行與教義檢定小視窗 ---------- */
 .quiz-overlay {
@@ -1220,7 +1452,7 @@ body {
 /* 御守從這個框的上緣慢慢降下來 */
 .omamori-stage {
   position: relative;
-  --art-height: clamp(190px, 38vh, 360px);
+  --art-height: clamp(230px, 48vh, 460px);
   width: 100%;
   height: var(--art-height);
   display: flex;
@@ -1267,46 +1499,25 @@ body {
 .omamori-pair {
   position: relative;
   z-index: 1;
-  width: min(100%, calc(var(--art-height) * 1.23));
-  aspect-ratio: 354 / 288;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1199 / 1312; /* 新版御守圖的實際尺寸 */
 }
-.omamori-img,
-.omamori-box-img {
-  position: absolute;
-  height: auto;
-  opacity: 0;
-  transform-origin: 50% 0;
-}
-/* 圖檔自帶透明邊，位置按實際可見的御守和盒身對齊。 */
+/* 圖檔上緣就是繩結，鐘擺式搖晃以此為軸心 */
 .omamori-img {
-  z-index: 1;
-  width: 67%;
-  left: -5.2%;
-  top: -6.5%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform-origin: 50% 4%;
 }
-.omamori-box-img {
-  width: 59.6%;
-  left: 44.2%;
-  top: 1%;
-}
-.omamori-stage:not(.has-box) .omamori-img {
-  left: 16.5%;
-}
-/* 由上往下：一邊緩緩降落，一邊從上緣逐段顯現 */
+/* 由上往下：一邊緩緩降落，一邊從上緣逐段顯現；落定後開始鐘擺搖晃，速度、幅度全程固定不變 */
 .omamori-stage.revealed .omamori-img {
   animation:
     omamori-descend 1.9s cubic-bezier(.2,.7,.25,1) both,
-    omamori-sway 6s 1.9s ease-in-out infinite;
-}
-.omamori-stage.revealed .omamori-box-img {
-  opacity: 1;
-  /* iOS Safari 上避免盒圖同時套用動態裁切和濾鏡。 */
-  animation: omamori-box-descend 1.9s cubic-bezier(.2,.7,.25,1);
-}
-@keyframes omamori-box-descend {
-  0% { opacity: 0; transform: translateY(-26%) scale(0.965); }
-  14% { opacity: 1; }
-  100% { transform: translateY(0) scale(1); }
+    omamori-sway 8.5s 1.9s ease-in-out infinite;
 }
 @keyframes omamori-descend {
   0% {
@@ -1323,9 +1534,10 @@ body {
     filter: blur(0) drop-shadow(0 12px 24px rgba(150, 96, 52, 0.25));
   }
 }
+/* 左右等幅、等時：每一次來回都一樣快，不會忽快忽慢 */
 @keyframes omamori-sway {
-  0%, 100% { transform: rotate(-1.1deg); }
-  50%      { transform: rotate(1.1deg); }
+  0%, 100% { transform: rotate(-1.5deg); }
+  50%      { transform: rotate(1.5deg); }
 }
 
 /* 御守底下的法語：分隔線 → 正文 → 署名，三層由重到輕 */
@@ -1371,18 +1583,20 @@ body {
 .omamori-word-text:empty { display: none; }
 .omamori-word-by {
   margin-top: 7px;
-  text-align: right;
+  text-align: center;
   font-size: clamp(11px, 2.7vw, 12.5px);
   font-weight: 700;
   letter-spacing: 1px;
   color: var(--gold);
 }
 .omamori-word-by:empty { display: none; }
-.omamori-word-by::before {
-  content: "\2014\2014\2009";
+.omamori-word-by::before,
+.omamori-word-by::after {
   opacity: 0.55;
   letter-spacing: 0;
 }
+.omamori-word-by::before { content: "\2014\2009"; }
+.omamori-word-by::after { content: "\2009\2014"; }
 
 .omamori-note {
   margin: clamp(10px, 2.6vw, 14px) 0 0;
@@ -1438,8 +1652,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .omamori-card { transition: opacity 0.2s ease; transform: none; }
   .omamori-overlay.show .omamori-card { transform: none; }
-  .omamori-stage.revealed .omamori-img,
-  .omamori-stage.revealed .omamori-box-img { animation: none; opacity: 1; }
+  .omamori-stage.revealed .omamori-img { animation: none; opacity: 1; }
   .omamori-knot { animation: none; }
   .omamori-word { transition: opacity 0.2s ease; transform: none; }
 }
