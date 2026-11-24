@@ -41,7 +41,7 @@ function renderInviteCardDraft(opts = {}) {
     eyebrow = "誠摯邀請",
     title = "寒修行",
     tagline = "反省．充實．重整",
-    body = "一起沉澱初心 重新出發 👣👣",
+    body = "回望初心 重心出發 👣👣",
     // 開白／中願／結願三階段，日期沿用官網 shinnyo-en.org.tw/at2026 當季公告的寫法
     // （只寫月/日和星期，不寫年份——跟官網那頁本身的寫法一致，年份交給下面的 yearLabel）
     schedule = [
