@@ -1983,6 +1983,21 @@ body {
 
 /* ---------- 小飛機飛向原點：降落時的光環 ----------
    飛機抵達「寒修行原點」那一格時擴散一圈就消失，像降落的提示。 */
+.plane-flight-label {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 70;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-shadow: 0 1px 3px #fffaf0, 0 0 5px #fffaf0, 0 0 8px #fffaf0;
+  will-change: transform, opacity;
+}
 .plane-land-ring {
   position: fixed;
   left: 0;

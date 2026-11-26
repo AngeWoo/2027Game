@@ -95,6 +95,12 @@ function flyPlaneTo(from, to, opts = {}) {
     "position:fixed;left:0;top:0;width:" + startSize + "px;height:auto;" +
     "z-index:70;pointer-events:none;will-change:transform,opacity;";
   document.body.appendChild(plane);
+  // 文字另外定位，保持水平可讀，不跟著往左飛的機身鏡射。
+  const label = document.createElement("span");
+  label.className = "plane-flight-label";
+  label.textContent = "回歸親苑";
+  label.setAttribute("aria-hidden", "true");
+  document.body.appendChild(label);
   const stopSound = playSound ? playSound(duration) : null;
 
   let raf = 0;
@@ -122,12 +128,19 @@ function flyPlaneTo(from, to, opts = {}) {
       " rotate(" + rot + "deg)" +
       (leftward ? " scale(-1,1)" : "") +
       " scale(" + scale + ")";
+    const radians = rot * Math.PI / 180;
+    const halfHeight = (Math.abs(Math.sin(radians)) * size +
+      Math.abs(Math.cos(radians)) * size * PLANE_RATIO) / 2;
+    label.style.opacity = String(opacity);
+    label.style.transform = "translate(" + pos.x + "px," + (pos.y - halfHeight - 8) +
+      "px) translate(-50%,-100%)";
 
     if (t < 1) {
       raf = requestAnimationFrame(frame);
       return;
     }
     plane.remove();
+    label.remove();
     if (stopSound) stopSound();
     if (landRing) showLandRing(p2);
     if (onDone) onDone();
@@ -141,6 +154,7 @@ function flyPlaneTo(from, to, opts = {}) {
     stopped = true;
     cancelAnimationFrame(raf);
     plane.remove();
+    label.remove();
     if (stopSound) stopSound();
   };
 }
