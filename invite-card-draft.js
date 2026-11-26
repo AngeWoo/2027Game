@@ -42,12 +42,15 @@ function renderInviteCardDraft(opts = {}) {
     title = "寒修行",
     tagline = "反省．充實．重整",
     body = "回望初心 重心出發 👣👣",
-    // 開白／中願／結願三階段，日期沿用官網 shinnyo-en.org.tw/at2026 當季公告的寫法
+    // 開白／中願／結願三階段，寫法沿用官網 shinnyo-en.org.tw 當季公告
     // （只寫月/日和星期，不寫年份——跟官網那頁本身的寫法一致，年份交給下面的 yearLabel）
+    //
+    // 2026-11-26 更正：星期原本抄自 at2026 那一頁，是 2026 年的星期（1/20 是二、1/24 是六…），
+    // 但這張卡講的是 2027 年的寒修行。2027/1/1 是星期五，重算後如下，別再改回去。
     schedule = [
-      { phase: "開白", range: "1/20(二) 〜 24(六)" },
-      { phase: "中願", range: "1/25(日) 〜 30(五)" },
-      { phase: "結願", range: "1/31(六) 〜 2/4(三)" },
+      { phase: "開白", range: "1/20(三) 〜 24(日)" },
+      { phase: "中願", range: "1/25(一) 〜 30(六)" },
+      { phase: "結願", range: "1/31(日) 〜 2/4(四)" },
     ],
     seal = "敬邀",
     yearLabel = "2027寒修行",
@@ -60,10 +63,17 @@ function renderInviteCardDraft(opts = {}) {
     personalNote = "", // 發送者自己打的話，放在印章上方的空白處
     personalName = "", // 發送者的名字，簽在那句話下面
     flap = 0, // 仙鶴拍翅膀的動畫進度（一圈＝1），GIF 每一幀給不同的值
+    // 旭日和仙鶴整體往左（負值）或往右（正值）移幾 px。
+    // 2026-11-26 定案 -55：動畫版的親苑落定後會放大，右上角需要空間，
+    // 旭日和仙鶴往左讓開，順便讓「寒修行」題字壓在旭日上的構圖更集中。0 ＝ 以前的位置。
+    skyShiftX = -55,
     pixelScale = 2, // 輸出解析度倍率；做 GIF 的每一幀用 1，省時間也省檔案大小
+    canvas: reuseCanvas = null, // 給連續重畫的動畫用：傳一張固定的 canvas 進來重複使用，
+                                // 不要每一幀都配置一張 900×600（在手機上會造成 GC 抖動）
   } = opts;
 
-  const canvas = document.createElement("canvas");
+  // 指定 width/height 本身就會把 canvas 整個重設（含 transform），所以重用很安全
+  const canvas = reuseCanvas || document.createElement("canvas");
   canvas.width = 900 * pixelScale;
   canvas.height = 600 * pixelScale;
   const ctx = canvas.getContext("2d", { alpha: false });
@@ -87,7 +97,7 @@ function renderInviteCardDraft(opts = {}) {
 
   // ---------- 旭日（放題字右上方當背光）----------
   ctx.save();
-  const sunX = 560, sunY = 150, sunR = 118;
+  const sunX = 560 + skyShiftX, sunY = 150, sunR = 118;
   const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 1.6);
   sunGlow.addColorStop(0, "rgba(243, 199, 107, 0.55)");
   sunGlow.addColorStop(1, "rgba(243, 199, 107, 0)");
@@ -168,7 +178,7 @@ function renderInviteCardDraft(opts = {}) {
     [824, 90, 0.74, 0.4, 0.37],
   ];
   for (const [cx, cy, scale, alpha, phaseOffset] of flock) {
-    crane(cx, cy, scale, alpha, flap + phaseOffset);
+    crane(cx + skyShiftX, cy, scale, alpha, flap + phaseOffset);
   }
 
   // ---------- 底部山景色帶：只佔最下面一小段，當資訊列的底紙 ----------

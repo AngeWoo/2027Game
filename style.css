@@ -1677,7 +1677,10 @@ body {
 .invite-card {
   position: relative;
   width: min(92vw, 520px);
+  /* 手機瀏覽器的 vh 算的是「網址列收起來」的高度，網址列還在時卡片就會超出畫面；
+     dvh 跟著實際可視高度走。舊瀏覽器讀不懂 dvh 會自動沿用上一行。 */
   max-height: 92vh;
+  max-height: 92dvh;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1724,6 +1727,12 @@ body {
 }
 
 .invite-preview-wrap {
+  /* flex 子項預設會被壓縮，而這一層是 overflow:hidden，
+     被壓到的結果是邀請卡下半截（開白／中願／結願、底部資訊列）直接被裁掉。
+     所以這裡不准縮——高度不夠時改由 fitInviteCard() 整個等比例縮小。 */
+  flex: none;
+  margin-inline: auto;
+  max-width: 100%;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--panel-border);
@@ -1766,20 +1775,27 @@ body {
   display: flex;
   justify-content: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* 手機上也維持左右並排，不要擠成上下兩排把卡片拉長 */
+}
+.invite-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 230px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* LINE 的品牌綠，純粹用來讓人一眼認出這是「傳去 LINE」的按鈕，不是官方標誌 */
 .invite-line {
-  padding: 12px 26px;
+  padding: 11px 14px;
   border: none;
   border-radius: 999px;
   background: linear-gradient(135deg, #06c856, #00b140);
   color: #fff;
   font-family: inherit;
-  font-size: clamp(14px, 3.4vw, 16px);
+  font-size: clamp(13px, 3.2vw, 15px);
   font-weight: 800;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(0, 177, 64, 0.32);
   transition: transform 0.18s ease;
@@ -1788,14 +1804,14 @@ body {
 .invite-line[hidden] { display: none; }
 
 .invite-save {
-  padding: 12px 34px;
+  padding: 11px 14px;
   border: none;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--accent-3), var(--accent-1));
   color: #fffaf2;
-  font-size: clamp(14px, 3.4vw, 16px);
+  font-size: clamp(13px, 3.2vw, 15px);
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.3px;
   text-decoration: none;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(var(--accent-1-rgb), 0.32);
@@ -1803,15 +1819,187 @@ body {
 }
 .invite-save:hover { transform: translateY(-2px); }
 
-.invite-hint {
-  margin: 12px 0 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-dim);
-  text-align: center;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .invite-card { transition: opacity 0.2s ease; transform: none; }
   .invite-overlay.show .invite-card { transform: none; }
+}
+
+/* ========== 彈出視窗統一尺寸（電腦、手機都一樣）==========
+   原本四個視窗各有各的寬高（今日實踐 580、邀請函 520、御守 430、地圖 640），
+   開起來大小不一。這裡統一成同一個框：同寬、同高、內容垂直置中。
+   裡面的圖會由 fitModal() / fitInviteCard() 長大去填滿這個框，不會空一片。
+   放在各自的規則後面，所以會蓋掉上面那些個別設定。 */
+.modal-overlay,
+.invite-overlay,
+.omamori-overlay,
+.map-overlay,
+.quiz-overlay {
+  /* 視窗用 height:100% 去吃滿可用高度，碰到 max-height 上限時再由 center 置中。
+     用 stretch 的話，被 max-height 擋下來多出來的空間會全部堆在下面，
+     變成上緣貼齊、下緣空一截，看起來沒有置中。 */
+  align-items: center;
+}
+
+.modal-card,
+.invite-card,
+.omamori-card,
+.map-card,
+.quiz-card {
+  width: min(92vw, 560px);
+  height: 100%;
+  max-height: 90vh;
+  max-height: 90dvh; /* 手機網址列收合時 vh 會算成比較大的視窗，dvh 才是實際看得到的高度 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 撐高之後內容垂直置中，不要全擠在上面 */
+  margin-block: auto; /* 高度不足以吃滿時，上下平均留白 */
+}
+
+/* ---------- 手機：上緣讓開左上／右上那兩顆固定按鈕 ----------
+   .invite-dot（左上・發送邀請函）和 .sound-toggle（右上・音效）都是
+   position: fixed、top: max(14px, 安全區)、高 40px、z-index 60。
+   手機上視窗很寬，上緣會直接疊到這兩顆按鈕身上（iPhone 真機實際看到的狀況）。
+   把外框上緣壓到按鈕下緣再加 10px，剩下的整塊空間都給視窗。 */
+@media (max-width: 560px) {
+  .modal-overlay,
+  .invite-overlay,
+  .omamori-overlay,
+  .map-overlay,
+  .quiz-overlay {
+    padding: calc(max(14px, env(safe-area-inset-top)) + 50px) 10px max(14px, env(safe-area-inset-bottom));
+    max-height: 100dvh;
+  }
+  .modal-card,
+  .invite-card,
+  .omamori-card,
+  .map-card,
+  .quiz-card {
+    width: 100%;
+    max-height: 100%; /* 外框已經讓開按鈕了，這裡直接吃滿剩下的空間 */
+  }
+  /* 左右內距縮小，裡面的圖才放得更大 */
+  .modal-card { --pad-x: 14px; }
+  .modal-card:not(.has-temple) { height: auto; }
+  .invite-card,
+  .omamori-card {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* 機會／命運這種沒有照片的格子不要撐滿：
+   框裡沒有可以放大的圖，硬撐成跟其他視窗一樣高只會上下空一片。
+   has-temple 這個 class 是 showTemple() 在有精舍照片時才加上去的。 */
+.modal-card:not(.has-temple) {
+  height: auto;
+  align-self: center; /* 解除外框的 stretch，改回垂直置中 */
+}
+
+/* ---------- 邀請函：這張卡走過的路線 ----------
+   跟動畫裡「一張一張飛回親苑」的那幾張是同一組地點，
+   讓使用者在送出之前就知道這張卡走過哪裡。 */
+.invite-route {
+  margin: 10px 0 14px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.7;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.invite-route[hidden] { display: none; }
+.invite-route .invite-route-home {
+  color: var(--accent-3);
+  font-weight: 800;
+}
+
+
+/* 手機：路線列壓扁一點，不要把預覽圖擠到最小 */
+@media (max-width: 560px) {
+  .invite-route {
+    margin: 6px 0 10px;
+    font-size: 11.5px;
+    line-height: 1.55;
+  }
+}
+
+/* ---------- 邀請函：這張卡是什麼 ----------
+   說明「卡片會動」和「對方掃 QR code 可以接著玩」，
+   順便把視窗下半部那塊空白用有資訊量的內容補起來。 */
+.invite-about {
+  margin: 0 0 12px;
+  padding: 9px 13px;
+  border-radius: 14px;
+  background: rgba(var(--accent-3-rgb), 0.07);
+  border: 1px solid rgba(var(--warm-ink-rgb), 0.12);
+}
+.invite-about-line {
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+}
+.invite-about-line b {
+  color: var(--accent-3);
+  font-weight: 800;
+}
+.invite-about-stat {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(var(--warm-ink-rgb), 0.18);
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+.invite-about-stat[hidden] { display: none; }
+.invite-about-stat b {
+  color: var(--accent-3);
+  font-weight: 800;
+}
+
+/* 手機：說明區塊壓扁一點，不要把預覽圖擠小 */
+@media (max-width: 560px) {
+  .invite-about {
+    margin-bottom: 10px;
+    padding: 9px 11px;
+  }
+  .invite-about-line {
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+  .invite-about-stat {
+    margin-top: 6px;
+    padding-top: 6px;
+    font-size: 11px;
+  }
+}
+
+/* 說明區塊收起來的狀態：由 fitInviteCard() 判斷後加上這個 class。
+   空間夠就顯示（把電腦版下半部那塊空白補起來），
+   不夠就收起來，優先保住邀請卡預覽 —— 那才是要寄出去的東西。 */
+.invite-card.hide-about .invite-about { display: none; }
+
+/* ---------- 小飛機飛向原點：降落時的光環 ----------
+   飛機抵達「寒修行原點」那一格時擴散一圈就消失，像降落的提示。 */
+.plane-land-ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(var(--gold-rgb), 0.9);
+  pointer-events: none;
+  z-index: 69;
+  animation: plane-land-ring 0.65s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes plane-land-ring {
+  from { transform: scale(0.4); opacity: 0.95; }
+  to { transform: scale(4.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plane-land-ring { display: none; }
 }

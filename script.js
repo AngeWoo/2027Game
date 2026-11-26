@@ -37,6 +37,7 @@ const TILE_COUNT = TILES.length; // 20
 const SFX = (() => {
   let ctx = null;
   let enabled = true;
+  let stopPlaneSound = null;
   try {
     const saved = localStorage.getItem("monopoly-sound");
     if (saved !== null) enabled = saved === "1";
@@ -126,6 +127,7 @@ const SFX = (() => {
     },
     toggle() {
       enabled = !enabled;
+      if (!enabled && stopPlaneSound) stopPlaneSound();
       try {
         localStorage.setItem("monopoly-sound", enabled ? "1" : "0");
       } catch (e) {
@@ -139,6 +141,71 @@ const SFX = (() => {
     },
     click() {
       tone({ freq: 720, duration: 0.06, type: "triangle", volume: 0.18 });
+    },
+    // 小飛機：低沉引擎疊上氣流與螺旋槳脈動，起飛漸強、降落漸弱。
+    plane(duration) {
+      if (stopPlaneSound) stopPlaneSound();
+      if (!enabled) return null;
+      const c = getCtx();
+      if (!c) return null;
+      const t0 = c.currentTime;
+      const seconds = duration / 1000;
+      const end = t0 + seconds;
+      const noise = c.createBufferSource();
+      const buffer = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const samples = buffer.getChannelData(0);
+      let brown = 0;
+      for (let i = 0; i < samples.length; i++) {
+        brown = (brown + (Math.random() * 2 - 1) * 0.02) / 1.02;
+        samples[i] = brown * 3.5;
+      }
+      noise.buffer = buffer;
+      noise.loop = true;
+      const filter = c.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(450, t0);
+      filter.frequency.linearRampToValueAtTime(1800, t0 + seconds * 0.4);
+      filter.frequency.linearRampToValueAtTime(350, end);
+      const engine = c.createOscillator();
+      engine.type = "sawtooth";
+      engine.frequency.setValueAtTime(65, t0);
+      engine.frequency.linearRampToValueAtTime(115, t0 + seconds * 0.35);
+      engine.frequency.linearRampToValueAtTime(55, end);
+      const engineGain = c.createGain();
+      engineGain.gain.value = 0.22;
+      const propeller = c.createOscillator();
+      propeller.frequency.value = 22;
+      const pulse = c.createGain();
+      pulse.gain.value = 0.07;
+      const envelope = c.createGain();
+      envelope.gain.setValueAtTime(0, t0);
+      envelope.gain.linearRampToValueAtTime(0.3, t0 + seconds * 0.18);
+      envelope.gain.linearRampToValueAtTime(0.2, t0 + seconds * 0.65);
+      envelope.gain.linearRampToValueAtTime(0, end);
+      noise.connect(filter);
+      engine.connect(engineGain);
+      propeller.connect(pulse);
+      pulse.connect(engineGain.gain);
+      engineGain.connect(filter);
+      filter.connect(envelope);
+      envelope.connect(c.destination);
+      const sources = [noise, engine, propeller];
+      sources.forEach((source) => { source.start(t0); source.stop(end); });
+      let stopped = false;
+      const stop = () => {
+        if (stopped) return;
+        stopped = true;
+        envelope.gain.cancelScheduledValues(c.currentTime);
+        envelope.gain.setTargetAtTime(0, c.currentTime, 0.015);
+        sources.forEach((source) => source.stop(c.currentTime + 0.06));
+        if (stopPlaneSound === stop) stopPlaneSound = null;
+      };
+      noise.onended = () => {
+        [noise, engine, propeller, engineGain, pulse, filter, envelope].forEach((node) => node.disconnect());
+        if (stopPlaneSound === stop) stopPlaneSound = null;
+      };
+      stopPlaneSound = stop;
+      return stop;
     },
     diceHit() {
       tone({ freq: 240 + Math.random() * 80, freqEnd: 110, duration: 0.07, type: "triangle", volume: 0.2 });
@@ -257,9 +324,10 @@ const inviteX = document.getElementById("inviteX");
 const invitePreview = document.getElementById("invitePreview");
 const inviteNote = document.getElementById("inviteNote");
 const inviteName = document.getElementById("inviteName");
+const inviteRoute = document.getElementById("inviteRoute");
+const inviteStat = document.getElementById("inviteStat");
 const inviteSave = document.getElementById("inviteSave");
 const inviteLine = document.getElementById("inviteLine");
-const inviteHint = document.getElementById("inviteHint");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
 const stageEl = document.querySelector(".stage");
@@ -721,7 +789,13 @@ function setBackgroundInert(on) {
 function dialogOpened(card, focusEl) {
   setBackgroundInert(true);
   if (snowCtl) snowCtl.pause();
-  (focusEl || card).focus({ preventScroll: true }); // 視窗只是透明度 0，不是 display:none，可以直接收焦點
+  // 視窗只是透明度 0，不是 display:none，可以直接收焦點。
+  // 但手機上不要自動把焦點放進文字框：那會立刻彈出鍵盤，視窗一打開就被鍵盤
+  // 擠掉一半（邀請函的卡片預覽會縮成一條）。改成先 focus 視窗本身，
+  // 使用者自己點輸入框時鍵盤才出來。電腦沒有這個問題，維持原本的行為。
+  let target = focusEl || card;
+  if (target && target.tagName === "INPUT" && isHandheld()) target = card;
+  target.focus({ preventScroll: true });
 }
 
 function dialogsClosed() {
@@ -813,11 +887,39 @@ function fitModal() {
   if (!photo) return;
   photo.style.height = "";
   photo.style.aspectRatio = "";
-  // 照片在左、文字在右的寬螢幕排法不縮，照片高度跟著文字走
-  const over = modalCard.scrollHeight - modalCard.clientHeight;
-  if (over > 0 && !modalCard.classList.contains("temple-wide")) {
-    photo.style.aspectRatio = "auto";
-    photo.style.height = `${Math.max(PHOTO_MIN, photo.offsetHeight - over - 2)}px`;
+  photo.style.maxHeight = "";
+  // 照片在左、文字在右的寬螢幕排法不動，照片高度跟著文字走
+  if (modalCard.classList.contains("temple-wide")) return;
+
+  // 視窗現在是固定高度，scrollHeight 會等於 clientHeight，直接比較量不出內容多高。
+  // 要先讓高度跟著內容走 —— 而且光設 height:auto 沒用：卡片是外框的 flex 子項，
+  // 外框的 align-items:stretch 會把它拉滿，所以 align-self 也要一起解除。
+  function contentGap() {
+    const keepH = modalCard.style.height;
+    const keepA = modalCard.style.alignSelf;
+    modalCard.style.alignSelf = "center";
+    modalCard.style.height = "auto";
+    const contentH = modalCard.scrollHeight;
+    modalCard.style.height = keepH;
+    modalCard.style.alignSelf = keepA;
+    return contentH - modalCard.clientHeight; // 正的＝塞不下，負的＝還有空間
+  }
+
+  // 一次算不準：照片一改高度，標題和內文會重新換行，高度又變了。
+  // 所以反覆調整幾次讓它收斂，而不是一次算死。
+  photo.style.aspectRatio = "auto";
+  photo.style.maxHeight = "none"; // CSS 上有 max-height: 34vh 的上限，要先解開才長得大
+  for (let i = 0; i < 4; i++) {
+    const gap = contentGap();
+    if (gap > 0) {
+      const next = Math.max(PHOTO_MIN, photo.offsetHeight - gap - 2);
+      if (next === photo.offsetHeight) break;
+      photo.style.height = `${next}px`;
+    } else if (gap < -8) {
+      photo.style.height = `${photo.offsetHeight - gap - 6}px`;
+    } else {
+      break;
+    }
   }
 }
 // 矮又寬的螢幕（筆電橫放）：照片放左邊、文字放右邊，省下垂直空間
@@ -1344,6 +1446,12 @@ function omamoriFallbackDownload(file) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+// 畫面尺寸一變就重算邀請卡版面：轉向、視窗縮放，
+// 以及手機網址列收合造成的可視高度變化（visualViewport）。
+window.addEventListener("resize", fitInviteCard);
+window.addEventListener("orientationchange", fitInviteCard);
+if (window.visualViewport) window.visualViewport.addEventListener("resize", fitInviteCard);
+
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
 async function saveOmamoriAs(file) {
   try {
@@ -1435,6 +1543,22 @@ async function openOmamori() {
   });
 }
 
+/* 按下「收下御守」：關掉視窗，並讓小飛機從按鈕那裡沿弧線飛向左下角的「寒修行原點」。
+
+   座標一定要在 closeOmamori() 之前量 —— 視窗一關，按鈕就不在畫面上了，
+   getBoundingClientRect() 會全部變成 0，飛機就會從左上角起飛。
+
+   只有這顆按鈕會放飛機：按右上角的 × 或點背景關掉是「跳過」，不給這個收尾。 */
+function takeOmamori() {
+  const r = omamoriClose.getBoundingClientRect();
+  const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  closeOmamori();
+  const startTile = document.querySelector(".tile.type-start");
+  if (startTile && typeof flyPlaneTo === "function") {
+    flyPlaneTo(from, startTile, { arc: 0.32, playSound: (duration) => SFX.plane(duration) });
+  }
+}
+
 function closeOmamori() {
   omamoriOverlay.classList.remove("show");
   omamoriStage.classList.remove("revealed");
@@ -1444,7 +1568,7 @@ function closeOmamori() {
 }
 
 if (omamoriOverlay) {
-  omamoriClose.addEventListener("click", closeOmamori);
+  omamoriClose.addEventListener("click", takeOmamori);
   omamoriX.addEventListener("click", closeOmamori);
   omamoriOverlay.addEventListener("click", (e) => {
     if (e.target === omamoriOverlay) closeOmamori(); // 和今日實踐視窗一樣：點背景就關
@@ -1465,6 +1589,19 @@ let inviteFile = null; // 目前已經做好、可以直接用的 GIF 檔
 let inviteDirty = true; // 文字改過、還沒重做 GIF
 let inviteBuildToken = 0; // 每次做 GIF +1，讓做到一半又被取代的結果自動作廢
 let invitePreviewTimer = null; // 靜態預覽圖的 debounce（只是重畫一次 canvas，不編碼）
+let invitePhotos = null; // 「回到親苑」要用的五張照片（見 invite-return-anim.js），每次打開重抽
+let invitePhotoToken = 0; // 連續開關兩次時，讓前一次還在載的照片自動作廢
+let invitePreviewResumeTimer = null; // 打完字之後把輪播接回去的計時器
+let invitePreviewRaf = 0; // 預覽輪播的 requestAnimationFrame id，0 ＝ 沒在播
+let invitePreviewT0 = 0; // 這一輪動畫從什麼時候開始
+let invitePreviewLast = 0; // 上一幀畫在什麼時候（用來壓到 20fps，不用每個畫面更新都畫）
+let invitePreviewCanvas = null; // 固定重複使用的畫布，避免每秒配置 20 張 900×600
+
+// 對話框裡的預覽用輪播的方式播：播一趟 → 停在親苑一下下 → 再播一次。
+// 跟輸出的 GIF 是同一組畫面（GIF 只播一次就停在親苑，預覽才會重播）。
+const INVITE_PLAY_MS = 3600; // 播一趟
+const INVITE_HOLD_MS = 1400; // 停在親苑多久再重來
+const INVITE_FPS_MS = 50; // 最多 20fps；這個內容不需要更滑順，省下來的都是手機的電
 
 async function getInviteAssets() {
   if (!inviteAssets) {
@@ -1474,6 +1611,59 @@ async function getInviteAssets() {
   return inviteAssets;
 }
 
+// 全球統計：沿用首頁那兩個公開計數（COUNTERS），沒有數字就整行不顯示
+function updateInviteStat() {
+  if (!inviteStat) return;
+  const steps = COUNTERS.items.steps.value;
+  const omamori = COUNTERS.items.omamori.value;
+  if (steps == null && omamori == null) {
+    inviteStat.hidden = true;
+    return;
+  }
+  const parts = [];
+  if (steps != null) parts.push(["全球已跨出 ", steps.toLocaleString("en-US"), " 步"]);
+  if (omamori != null) parts.push(["已領受御守 ", omamori.toLocaleString("en-US"), " 張"]);
+  const nodes = [];
+  parts.forEach((p, i) => {
+    if (i) nodes.push(document.createTextNode("　·　"));
+    nodes.push(document.createTextNode(p[0]));
+    nodes.push(Object.assign(document.createElement("b"), { textContent: p[1] }));
+    nodes.push(document.createTextNode(p[2]));
+  });
+  inviteStat.replaceChildren(...nodes);
+  inviteStat.hidden = false;
+}
+
+// 用照片檔名回查是哪一間精舍（pickReturnPhotos 回傳的是 Image，沒有帶名字）
+function templeByImgSrc(src) {
+  if (typeof TEMPLE_LIST === "undefined" || !Array.isArray(TEMPLE_LIST) || !src) return null;
+  return TEMPLE_LIST.find((t) => t.img && src.endsWith(t.img)) || null;
+}
+
+// 這張卡走過哪裡：跟動畫裡一張一張飛回親苑的那幾張是同一組
+function updateInviteRoute() {
+  if (!inviteRoute) return;
+  if (!invitePhotos || invitePhotos.length < 2) {
+    inviteRoute.hidden = true;
+    return;
+  }
+  const stops = [];
+  invitePhotos.slice(0, -1).forEach((img) => {
+    const t = img && templeByImgSrc(img.src);
+    const label = t && (t.country || t.short);
+    if (label && stops[stops.length - 1] !== label) stops.push(label);
+  });
+  if (!stops.length) {
+    inviteRoute.hidden = true;
+    return;
+  }
+  inviteRoute.replaceChildren(
+    document.createTextNode("✈️ 這張卡走過：" + stops.join(" → ") + " → "),
+    Object.assign(document.createElement("span"), { className: "invite-route-home", textContent: "原點・親苑" })
+  );
+  inviteRoute.hidden = false;
+}
+
 function inviteFileName(name) {
   const who = name.trim();
   return who ? `寒修行邀請函_${who}.gif` : "寒修行邀請函.gif";
@@ -1481,20 +1671,156 @@ function inviteFileName(name) {
 
 // 只重畫一次 canvas（固定姿勢，不是動畫迴圈），讓對話框裡可以看到文字疊上去的樣子。
 // 用 debounce 延遲一下、而且只畫一次就停，不會跟打字搶主執行緒。
-function drawInvitePreviewOnce() {
+// 畫動畫的某一幀到對話框的預覽畫布上。
+// 照片還沒載完（或親苑的圖掛了）就退回原本的靜態卡片，不讓對話框空著。
+function drawInvitePreviewAt(t) {
   if (!inviteAssets) return;
-  const personalNote = inviteNote.value.trim();
-  const personalName = inviteName.value.trim();
-  const canvas = renderInviteCardDraft({ ...inviteAssets, placeImage: invitePlaceImage, personalNote, personalName, flap: 0, pixelScale: 1 });
+  if (!invitePreviewCanvas) invitePreviewCanvas = document.createElement("canvas");
+  const opts = {
+    ...inviteAssets,
+    personalNote: inviteNote.value.trim(),
+    personalName: inviteName.value.trim(),
+    pixelScale: 1,
+    canvas: invitePreviewCanvas, // 固定重複使用，不要每一幀配一張新的
+  };
+  const canvas = invitePhotos
+    ? renderReturnFrame(opts, invitePhotos, t)
+    : renderInviteCardDraft({ ...opts, placeImage: invitePlaceImage, flap: 0 });
   const pctx = invitePreview.getContext("2d");
-  pctx.clearRect(0, 0, invitePreview.width, invitePreview.height);
   pctx.drawImage(canvas, 0, 0, invitePreview.width, invitePreview.height);
 }
 
+// 只畫一張不會動的：停在親苑那一幀，也就是收件人最後看到的畫面
+function drawInvitePreviewOnce() {
+  drawInvitePreviewAt(invitePhotos ? 1 : 0);
+}
+
+/* 手機版面：量出「除了預覽圖以外」的東西佔掉多少高度，把剩下的全部給預覽圖，
+   讓邀請卡在不被裁切的前提下盡可能大。
+
+   為什麼需要用 JS 動態算：
+   1. 手機瀏覽器的網址列會收合，vh 算的是收起來之後的高度，網址列還在時卡片就超出畫面；
+      visualViewport.height 才是「現在真的看得到」的高度，而且它會隨著捲動即時變。
+   2. 底下那行提示字會因為裝置支不支援分享選單而變長變短，高度不是固定的。
+   預覽圖是 3:2，所以寬度 = 可用高度 × 1.5。 */
+const INVITE_PREVIEW_MIN_W = 210; // 再小就看不清楚了，寧可讓卡片可以捲
+const INVITE_PREVIEW_COMFORT_W = 300; // 預覽圖窄到這個程度，就把說明區塊收起來把空間還給它
+
+function fitInviteCard() {
+  if (!inviteOverlay.classList.contains("show")) return;
+  const wrap = invitePreview.parentElement;
+  if (!wrap) return;
+
+  const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  // 外框的 padding 會因為手機安全區和「讓開上方兩顆按鈕」而變，所以要實際量，不能寫死比例
+  const ov = getComputedStyle(inviteOverlay);
+  const avail = vh - parseFloat(ov.paddingTop) - parseFloat(ov.paddingBottom);
+  // 高度原則上交給 CSS（才會跟其他視窗一樣高）；只有在手機網址列把可視高度吃掉時，
+  // 才自己夾一個高度上限，不然視窗下半部會被網址列蓋住。
+  inviteCard.style.maxHeight = vh < window.innerHeight - 1 ? Math.round(avail) + "px" : "";
+
+  // 鍵盤彈出來時可視高度會被砍掉一大半，那時候不要重算版面
+  // （不然圖會縮成一條，收鍵盤之後又彈回來，畫面一直跳）
+  if (vh < window.innerHeight * 0.7) return;
+
+  // 先把預覽縮到幾乎沒有，量出其他內容的真實高度。
+  // 卡片現在是固定高度（CSS 的 height:100%），scrollHeight 會等於 clientHeight，
+  // 所以量之前要先讓高度跟著內容走，量完馬上還原。
+  // 量「除了預覽圖以外」有多高，再把剩下的高度全部給預覽圖（預覽是 3:2，寬＝高×1.5）。
+  // 光設 height:auto 沒用：卡片是外框的 flex 子項，外框會把它拉滿，
+  // 所以 align-self 也要一起解除，才量得到真正的內容高度。
+  function previewWidthFor() {
+    const beforeW = wrap.style.width;
+    const beforeH = inviteCard.style.height;
+    const beforeA = inviteCard.style.alignSelf;
+    wrap.style.width = "1px";
+    inviteCard.style.alignSelf = "center";
+    inviteCard.style.height = "auto";
+    const others = inviteCard.scrollHeight - wrap.getBoundingClientRect().height;
+    inviteCard.style.height = beforeH;
+    inviteCard.style.alignSelf = beforeA;
+    wrap.style.width = beforeW;
+
+    const cs = getComputedStyle(inviteCard);
+    const innerW = inviteCard.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const availH = inviteCard.clientHeight - others - 4;
+    return Math.max(INVITE_PREVIEW_MIN_W, Math.min(innerW, availH * 1.5));
+  }
+
+  // 先試著把說明區塊顯示出來（它的用途就是補滿空白）；
+  // 如果這樣會把預覽圖擠得太小，就收起來 —— 要寄出去的是那張卡片，它優先。
+  inviteCard.classList.remove("hide-about");
+  let w = previewWidthFor();
+  if (w < INVITE_PREVIEW_COMFORT_W) {
+    inviteCard.classList.add("hide-about");
+    w = previewWidthFor();
+  }
+  wrap.style.width = Math.round(w) + "px";
+}
+
+function inviteReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function stopInvitePreviewAnim() {
+  if (invitePreviewRaf) cancelAnimationFrame(invitePreviewRaf);
+  invitePreviewRaf = 0;
+}
+
+// 輪播：播一趟 → 停在親苑 INVITE_HOLD_MS → 再播。
+// 整張 900×600 重畫一次實測 0.5ms，壓在 20fps 等於 1% 的主執行緒，不會跟打字搶。
+// （原本程式碼註解提到的卡頓是 GIF 編碼造成的，那個現在還是只在按下按鈕時才做。）
+function invitePreviewTick(now) {
+  invitePreviewRaf = requestAnimationFrame(invitePreviewTick);
+  if (now - invitePreviewLast < INVITE_FPS_MS) return;
+  invitePreviewLast = now;
+  const elapsed = now - invitePreviewT0;
+  if (elapsed >= INVITE_PLAY_MS + INVITE_HOLD_MS) {
+    invitePreviewT0 = now;
+    drawInvitePreviewAt(0);
+    return;
+  }
+  drawInvitePreviewAt(Math.min(1, elapsed / INVITE_PLAY_MS));
+}
+
+function startInvitePreviewAnim() {
+  stopInvitePreviewAnim();
+  if (!inviteOverlay.classList.contains("show") || !inviteAssets) return;
+  // 沒有照片就沒有動畫可播；使用者要求減少動態效果時也只給一張靜態圖
+  if (!invitePhotos || inviteReducedMotion()) {
+    drawInvitePreviewOnce();
+    return;
+  }
+  invitePreviewT0 = performance.now();
+  invitePreviewLast = 0;
+  invitePreviewRaf = requestAnimationFrame(invitePreviewTick);
+}
+
+// 打字的當下把輪播停掉，只用原本的 debounce 重畫一張，讓剛打的字馬上看得到；
+// 停手之後再把動畫接回去。這是照原本檔案的設計意圖做的：輸入框全程不跟任何背景工作搶。
 function queueInvitePreview() {
   inviteDirty = true;
+  stopInvitePreviewAnim();
+  clearTimeout(invitePreviewResumeTimer);
   clearTimeout(invitePreviewTimer);
-  invitePreviewTimer = setTimeout(drawInvitePreviewOnce, 250);
+  invitePreviewTimer = setTimeout(() => {
+    drawInvitePreviewOnce();
+    invitePreviewResumeTimer = setTimeout(startInvitePreviewAnim, 450);
+  }, 250);
+}
+
+// 系統的分享面板吃不吃得下檔案 —— 不限手機。
+// Windows 上 Chrome 的 navigator.share() 會叫出系統分享面板，而 Microsoft Store 版的 LINE
+// 在 manifest 裡宣告了 windows.shareTarget（支援 StorageItems，也就是檔案），
+// 所以電腦上也能把 GIF 直接交給 LINE，不必經過剪貼簿、也不用使用者自己附加圖片。
+// 跟實際檔案內容無關，用一個假檔案探一次就好。
+function canSystemShareFiles() {
+  try {
+    const probe = new File([new Uint8Array([0])], "p.gif", { type: "image/gif" });
+    return !!navigator.canShare && navigator.canShare({ files: [probe] });
+  } catch {
+    return false;
+  }
 }
 
 // 裝置是否叫得出手機那種「分享選單」——跟實際檔案內容無關，先用一個假檔案探一次就好，
@@ -1510,14 +1836,8 @@ function canShareInviteFiles() {
 function syncInviteButtonLabel() {
   const canShareSheet = canShareInviteFiles();
   inviteSave.textContent = canShareSheet ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
-  if (inviteLine) {
-    inviteLine.hidden = canShareSheet;
-    if (inviteHint) {
-      inviteHint.textContent = canShareSheet
-        ? "手機會直接跳出分享選單，選 LINE 傳給朋友。"
-        : "按「用 LINE 傳送」會先存好圖片、順便開啟 LINE；記得在 LINE 裡把圖片也附加上去。";
-    }
-  }
+  // 手機叫得出分享選單時就不用另外給「用 LINE 傳送」，分享選單裡就有 LINE
+  if (inviteLine) inviteLine.hidden = canShareSheet;
 }
 
 // 真正做 GIF：只在按下分享／下載按鈕的那一刻呼叫。已經做好、文字又沒改過就直接重複用。
@@ -1530,7 +1850,10 @@ async function ensureInviteFile() {
     const assets = await getInviteAssets();
     const personalNote = inviteNote.value.trim();
     const personalName = inviteName.value.trim();
-    const blob = await buildInviteGif({ ...assets, placeImage: invitePlaceImage, personalNote, personalName });
+    const cardOpts = { ...assets, personalNote, personalName };
+    const blob = invitePhotos
+      ? await buildReturnGif(cardOpts, invitePhotos)
+      : await buildInviteGif({ ...cardOpts, placeImage: invitePlaceImage }); // 照片沒載到就退回原本只有仙鶴拍翅的版本
     if (token !== inviteBuildToken) return inviteFile; // 這份還沒做完，使用者又點了一次，用最新那份就好
     inviteFile = new File([blob], inviteFileName(personalName), { type: "image/gif" });
     inviteDirty = false;
@@ -1547,14 +1870,10 @@ async function buildInvitePngBlob() {
   const assets = await getInviteAssets();
   const personalNote = inviteNote.value.trim();
   const personalName = inviteName.value.trim();
-  const canvas = renderInviteCardDraft({
-    ...assets,
-    placeImage: invitePlaceImage,
-    personalNote,
-    personalName,
-    flap: 0,
-    pixelScale: 2,
-  });
+  const opts = { ...assets, personalNote, personalName, pixelScale: 2 };
+  const canvas = invitePhotos
+    ? renderReturnFrame(opts, invitePhotos, 1) // 靜態圖一律用最後一幀：放大的親苑
+    : renderInviteCardDraft({ ...opts, placeImage: invitePlaceImage, flap: 0 });
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("PNG 轉檔失敗");
   return blob;
@@ -1591,19 +1910,39 @@ function openInvite({ defaultNote = "", placeImg = null } = {}) {
   inviteName.value = "";
   inviteDirty = true;
   invitePlaceImage = null; // 先清掉上一次的照片，等這次的（如果有）載完再換上
+  invitePhotos = null;
   inviteOverlay.classList.add("show");
   dialogOpened(inviteCard, inviteNote);
+  if (inviteRoute) inviteRoute.hidden = true; // 等這次的照片抽好再顯示
+  updateInviteStat();
   syncInviteButtonLabel();
+  fitInviteCard();
   getInviteAssets().then(() => {
-    if (inviteOverlay.classList.contains("show")) drawInvitePreviewOnce();
+    if (!inviteOverlay.classList.contains("show")) return;
+    drawInvitePreviewOnce();
+    fitInviteCard();
   });
-  if (placeImg) {
-    loadOmamoriImage(placeImg).then((image) => {
+  // 「回到親苑」要的五張照片：先把當地那張載進來（有的話），再抽三間不同洲的世界精舍，
+  // 最後加上親苑。中間三間每次重抽，所以每張邀請卡走過的路都不一樣。
+  // token 是為了連續開關兩次時，讓前一次還在載的那組自動作廢。
+  const token = ++invitePhotoToken;
+  (placeImg ? loadOmamoriImage(placeImg) : Promise.resolve(null))
+    .then((image) => {
+      if (token !== invitePhotoToken) return null;
       invitePlaceImage = image;
       inviteDirty = true;
       if (inviteOverlay.classList.contains("show")) drawInvitePreviewOnce();
+      return pickReturnPhotos(image, loadOmamoriImage);
+    })
+    .then((photos) => {
+      if (token !== invitePhotoToken || !photos) return;
+      invitePhotos = photos;
+      inviteDirty = true;
+      updateInviteRoute();
+      if (!inviteOverlay.classList.contains("show")) return;
+      fitInviteCard();
+      startInvitePreviewAnim();
     });
-  }
 }
 
 // 從「今日實踐」視窗的「邀朋友」按鈕打開邀請函時，記著要回去的那張小卡
@@ -1612,6 +1951,8 @@ let inviteReturnTile = null;
 function closeInvite() {
   inviteOverlay.classList.remove("show");
   SFX.click();
+  stopInvitePreviewAnim();
+  clearTimeout(invitePreviewResumeTimer);
   clearTimeout(invitePreviewTimer);
   if (inviteReturnTile) {
     inviteReturnTile = null;
@@ -1675,6 +2016,30 @@ if (inviteBtn) {
   // 能做到的是：開啟 LINE 並帶入祝福文字，圖片用上面存好的那張，使用者自己在 LINE 裡附加。
   if (inviteLine) {
     inviteLine.addEventListener("click", async () => {
+      // 電腦上如果系統分享面板吃得下檔案，就直接把 GIF 交給它：
+      // 在 Windows 的分享面板裡選 LINE，送出去就是一則「帶著動圖」的訊息，
+      // 不用剪貼簿、也不用使用者自己去附加圖片。
+      if (canSystemShareFiles()) {
+        let shareFile;
+        try {
+          shareFile = await ensureInviteFile();
+        } catch {
+          showToast("邀請卡製作失敗，請再試一次");
+          syncInviteButtonLabel();
+          return;
+        }
+        syncInviteButtonLabel();
+        SFX.click();
+        try {
+          await navigator.share({ files: [shareFile], title: "寒修行邀請函" });
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return; // 使用者自己關掉分享面板
+          // 其他錯誤（例如做圖做太久、瀏覽器判定已經不算「這次點擊」觸發的）
+          // 就讓它往下走，用原本那條「開 LINE ＋ 存檔」的路，不要讓使用者卡住
+        }
+      }
+
       // 緊跟著這次點擊同步呼叫，圖晚一點畫好沒關係（見 copyInviteImageToClipboard 的說明）
       const clipboardPromise = copyInviteImageToClipboard();
 
@@ -1683,8 +2048,12 @@ if (inviteBtn) {
         file = await ensureInviteFile();
       } catch {
         showToast("邀請卡製作失敗，請再試一次");
+        syncInviteButtonLabel();
         return;
       }
+      // ensureInviteFile 會把「下載邀請卡」改成「製作動畫中…」，這條路以前忘了改回來，
+      // 按過一次「用 LINE 傳送」之後那顆按鈕就一直卡在「製作動畫中…」。
+      syncInviteButtonLabel();
       SFX.click();
       const copied = await clipboardPromise;
       const note = inviteNote.value.trim();
@@ -1704,6 +2073,12 @@ if (inviteBtn) {
     });
   }
 }
+
+// 畫面尺寸一變就重算邀請卡版面：轉向、視窗縮放，
+// 以及手機網址列收合造成的可視高度變化（visualViewport）。
+window.addEventListener("resize", fitInviteCard);
+window.addEventListener("orientationchange", fitInviteCard);
+if (window.visualViewport) window.visualViewport.addEventListener("resize", fitInviteCard);
 
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
 async function saveInviteAs(file) {

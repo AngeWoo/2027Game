@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>邀請卡動畫草稿 · 回到親苑</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 20px 72px;
+    background: #efe7d6;
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    color: #4a3a2a;
+  }
+  h1 { font-size: 17px; letter-spacing: 3px; margin: 0 0 6px; font-weight: 800; }
+  h2 { font-size: 13px; letter-spacing: 2px; margin: 36px 0 12px; color: #8a7760; font-weight: 700; }
+  .sub { font-size: 12.5px; color: #93826e; margin: 0 0 20px; letter-spacing: .5px; line-height: 1.7; max-width: 920px; }
+
+  .stage {
+    display: inline-block;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 16px 34px rgba(90, 60, 40, .28);
+    max-width: 100%;
+    background: #fdf8ee;
+  }
+  #anim { display: block; width: 900px; max-width: 100%; height: auto; }
+
+  .bar { display: flex; align-items: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; max-width: 900px; }
+  button {
+    padding: 9px 20px; border: 0; border-radius: 999px; cursor: pointer;
+    background: #8a5a1e; color: #fff; font-size: 13px; letter-spacing: 1px;
+    font-family: inherit;
+  }
+  button.ghost { background: #d9c7a8; color: #5a4525; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=range] { flex: 1 1 220px; min-width: 180px; accent-color: #8a5a1e; }
+  .tcode { font-size: 12px; color: #8a7760; min-width: 92px; font-variant-numeric: tabular-nums; }
+
+  .board { display: flex; flex-wrap: wrap; gap: 14px; }
+  .shot { width: 290px; }
+  .shot canvas { display: block; width: 290px; height: auto; border-radius: 7px; box-shadow: 0 7px 16px rgba(90,60,40,.22); }
+  .shot .cap { margin-top: 7px; font-size: 12px; line-height: 1.6; color: #6b5636; }
+  .shot .cap b { color: #8a5a1e; letter-spacing: 1px; }
+
+  .size-out { font-size: 12.5px; color: #6b5636; line-height: 1.9; margin-top: 10px; white-space: pre-line; }
+  .note { max-width: 920px; font-size: 12.5px; line-height: 1.85; color: #6b5636; }
+  .note code { background: #e5d8c0; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>邀請卡動畫草稿 · 回到親苑</h1>
+<p class="sub">
+  寒修行的原點在親苑，遊戲帶著玩家走到世界各地的精舍 —— 這支動畫把那段路收回來：
+  世界各地的精舍照片一張一張飛回右上角的相片框，最後落定的那一張是<b>親苑</b>，
+  旭日同時亮一下，仙鶴朝著它收攏。<br>
+  這是提案用的草稿頁，<b>script.js 的邀請卡流程完全沒有被改動</b>；
+  <code>invite-card-draft.js</code> 只動了兩件事：把開白／中願／結願的星期更正為 2027 年的，
+  以及新增 <code>skyShiftX</code> 參數（預設 0，正式卡片的旭日和仙鶴位置維持原樣）。
+</p>
+
+<h2>動畫（循環播放）</h2>
+<div class="stage"><canvas id="anim" width="900" height="600"></canvas></div>
+<div class="bar">
+  <button id="playBtn">⏸ 暫停</button>
+  <input type="range" id="scrub" min="0" max="999" value="0">
+  <span class="tcode" id="tcode">t = 0.000</span>
+</div>
+<div class="bar">
+  <span class="tcode" style="min-width:132px">月亮／海鷗左右位置</span>
+  <input type="range" id="sky" min="-180" max="60" value="-55">
+  <span class="tcode" id="skycode">-55 px</span>
+  <button class="ghost" id="skyReset">舊位置 (0)</button>
+</div>
+
+<h2>分鏡（六個關鍵時間點）</h2>
+<div class="board" id="board"></div>
+
+<h2>GIF 檔案大小實測</h2>
+<p class="note">
+  現在正式卡片的 GIF 是 <code>6 幀 / 900×600</code>，只有仙鶴在拍翅膀。
+  這支動畫要講一段路，幀數一定會變多，檔案也會跟著變大 ——
+  按下面的按鈕會真的編碼幾種組合，量出實際大小再決定要用哪一種。
+</p>
+<button id="sizeBtn">⏱ 開始實測（會跑一陣子）</button>
+<div class="size-out" id="sizeOut"></div>
+
+<script src="invite-card-draft.js?v=5"></script>
+<script src="gif.js?v=1"></script>
+<script src="invite-return-anim.js?v=9"></script>
+<script src="invite-return-preview.js?v=5"></script>
+</body>
+</html>
