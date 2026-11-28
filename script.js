@@ -404,13 +404,11 @@ const omamoriStage = document.getElementById("omamoriStage");
 const omamoriImg = document.getElementById("omamoriImg");
 const omamoriClose = document.getElementById("omamoriClose");
 const omamoriSave = document.getElementById("omamoriSave");
+const omamoriLine = document.getElementById("omamoriLine");
 const pressSaveOverlay = document.getElementById("pressSaveOverlay");
 const pressSaveImg = document.getElementById("pressSaveImg");
 const pressSaveX = document.getElementById("pressSaveX");
-const pressSaveCopy = document.getElementById("pressSaveCopy");
-const pressSaveUrl = document.getElementById("pressSaveUrl");
 const pressSaveDownload = document.getElementById("pressSaveDownload");
-const pressSaveShare = document.getElementById("pressSaveShare");
 const pressSaveInfo = document.getElementById("pressSaveInfo");
 const pressSaveStatus = document.getElementById("pressSaveStatus");
 const omamoriX = document.getElementById("omamoriX");
@@ -428,6 +426,7 @@ const inviteName = document.getElementById("inviteName");
 const inviteRoute = document.getElementById("inviteRoute");
 const inviteStat = document.getElementById("inviteStat");
 const inviteSave = document.getElementById("inviteSave");
+const inviteLine = document.getElementById("inviteLine");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
 const stageEl = document.querySelector(".stage");
@@ -1474,21 +1473,68 @@ function omamoriFileName(src) {
   return `真如世界大冒險 Going_御守明信片_${no}.png`;
 }
 
+// LINE 的 Android WebView UA 也含 Chrome，必須以 Line/ 識別；
+// 不用 referrer，避免從 LINE 轉到真正的 Chrome 後仍被當作內建瀏覽器。
+function isLineBrowser(userAgent = navigator.userAgent) {
+  return /\bLine\//i.test(userAgent);
+}
+
+function isAndroidLineBrowser() {
+  return isLineBrowser() && /Android/i.test(navigator.userAgent);
+}
+
+function syncDownloadBrowserUI() {
+  const blocked = isAndroidLineBrowser() || !("download" in document.createElement("a"));
+  for (const button of [omamoriSave, inviteSave, pressSaveDownload]) {
+    if (button) button.hidden = blocked;
+  }
+}
+
 // 手機／平板？有 userAgentData 就問它，沒有就看是不是觸控裝置（iOS Safari 走這條）
 function isHandheld() {
+  // iPad 的桌面版 UA 可能顯示 Macintosh，仍須保留原生檔案分享。
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) return true;
   if (navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean") {
     return navigator.userAgentData.mobile;
   }
   return window.matchMedia("(pointer: coarse)").matches;
 }
 
-// 分享支援只代表能交給系統，不代表 Android 提供「存到相簿」。
+// 檔案分享支援不代表 LINE 一定可接收，也不代表已存入相簿。
 function canShareImageFile(file) {
   try {
-    return !!file && window.isSecureContext && typeof navigator.share === "function" &&
+    // 桌面與 Android LINE 不提供此入口；iOS LINE 依實際檔案能力判斷。
+    // 用這次真正要分享的 PNG／GIF 檢查，不用網址、文字或空檔案探測。
+    return !!file && file.size > 0 && /^(image\/png|image\/gif)$/.test(file.type) &&
+      !isAndroidLineBrowser() && isHandheld() && window.isSecureContext && typeof navigator.share === "function" &&
       typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
   } catch {
     return false;
+  }
+}
+
+function syncImageShareButton(button, file) {
+  button.hidden = !canShareImageFile(file);
+}
+
+// 必須在使用者點擊當下，直接把已備妥的 File 交給系統。
+// Web Share 無法偵測 LINE 是否安裝或指定接收 App，因此由使用者在選單中選 LINE。
+async function sharePreparedImageFile(file, button, report = showToast) {
+  if (!canShareImageFile(file)) {
+    syncImageShareButton(button, null);
+    return;
+  }
+  button.disabled = true;
+  try {
+    await navigator.share({ files: [file], title: file.type === "image/gif" ? "寒修行邀請函" : "今日御守明信片" });
+  } catch (err) {
+    if (!err || err.name !== "AbortError") {
+      syncImageShareButton(button, null);
+      report("分享失敗");
+    }
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -1505,7 +1551,6 @@ function fileToDataURL(file) {
 let pressSaveFile = null;
 let pressSaveObjectUrl = null;
 let pressSaveReturnFocus = null;
-const androidDownloadHint = "Android：下載後到「檔案 → 下載（Download）」查看。相簿未顯示時，可用檔案 App 將圖片複製到「Pictures」資料夾。";
 
 function releasePressSaveUrl() {
   const url = pressSaveObjectUrl;
@@ -1528,6 +1573,7 @@ function closePressToSave() {
 }
 
 async function showPressToSave(file) {
+  if (isAndroidLineBrowser()) return;
   if (!pressSaveOverlay) {
     omamoriFallbackDownload(file); // 沒有這個視窗就退回原本的做法
     return;
@@ -1540,12 +1586,9 @@ async function showPressToSave(file) {
   pressSaveDownload.download = file.name;
   const isGif = file.type === "image/gif";
   pressSaveDownload.textContent = isGif ? "⤓ 下載 GIF 邀請函" : "⤓ 下載 PNG 明信片";
-  pressSaveInfo.textContent = `${file.name}（${(file.size / 1024 / 1024).toFixed(2)} MB）${isGif ? "・保留完整動畫" : ""}`;
-  pressSaveStatus.textContent = androidDownloadHint;
-  pressSaveShare.hidden = !canShareImageFile(file);
-  pressSaveShare.disabled = false;
+  pressSaveInfo.textContent = file.name;
+  pressSaveStatus.textContent = "";
   pressSaveImg.removeAttribute("src");
-  if (pressSaveUrl) pressSaveUrl.textContent = location.href;
   pressSaveOverlay.classList.add("show");
   pressSaveOverlay.querySelector(".press-save-card").scrollTop = 0;
   pressSaveDownload.focus({ preventScroll: true });
@@ -1553,74 +1596,16 @@ async function showPressToSave(file) {
     const dataUrl = await fileToDataURL(file);
     if (pressSaveFile === file) pressSaveImg.src = dataUrl;
   } catch {
-    if (pressSaveFile === file) pressSaveStatus.textContent = "預覽載入失敗，仍可點下載取得原始檔案。";
-  }
-}
-
-/* 複製網址：WebView 裡最可靠的出口就是「換一個瀏覽器開」。
-   clipboard API 在部分 WebView 會被擋，所以留一條老派的 execCommand 備案。 */
-async function copyPageLink() {
-  const url = location.href;
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(url);
-      return true;
-    }
-  } catch {
-    /* 掉到下面那條 */
-  }
-  try {
-    const box = document.createElement("textarea");
-    box.value = url;
-    box.setAttribute("readonly", "");
-    box.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
-    document.body.appendChild(box);
-    box.select();
-    box.setSelectionRange(0, url.length);
-    const ok = document.execCommand("copy");
-    box.remove();
-    return ok;
-  } catch {
-    return false;
+    if (pressSaveFile === file) pressSaveStatus.textContent = "預覽載入失敗";
   }
 }
 
 if (pressSaveOverlay) {
-  pressSaveDownload.addEventListener("click", () => {
-    // 讓原生 <a download> 在這次手勢直接下載，不等待轉檔或呼叫分享。
-    pressSaveStatus.textContent = "已交給瀏覽器處理下載；請查看下載通知或「檔案 → 下載」。若沒有檔案，請改用 Chrome 重新下載。";
-  });
-  pressSaveShare.addEventListener("click", async () => {
-    const file = pressSaveFile;
-    if (!canShareImageFile(file)) {
-      pressSaveStatus.textContent = "此瀏覽器無法分享此檔案，請點下載。";
-      return;
-    }
-    pressSaveShare.disabled = true;
-    try {
-      // 檔案已備妥，直接在點擊當下呼叫，避免 GIF 轉檔耗盡使用者啟用期限。
-      await navigator.share({ files: [file], title: file.type === "image/gif" ? "寒修行邀請函" : "今日御守明信片" });
-      if (pressSaveFile === file) pressSaveStatus.textContent = "檔案已交給分享選單；要保留在手機，請點下載或使用接收 App 的儲存功能。";
-    } catch (err) {
-      if (pressSaveFile === file) pressSaveStatus.textContent = err && err.name === "AbortError"
-        ? "已取消分享；仍可點下載保留檔案。"
-        : "分享未完成，請點下載；若在 App 內開啟，請改用 Chrome。";
-    } finally {
-      if (pressSaveFile === file) pressSaveShare.disabled = false;
-    }
-  });
   pressSaveX.addEventListener("click", closePressToSave);
   pressSaveOverlay.addEventListener("click", (e) => {
     // 只有點到背景才關；點在圖片上要留給「長按」，不能被關掉
     if (e.target === pressSaveOverlay) closePressToSave();
   });
-  if (pressSaveCopy) {
-    pressSaveCopy.addEventListener("click", async () => {
-      const ok = await copyPageLink();
-      pressSaveCopy.textContent = ok ? "✓ 已複製，貼到瀏覽器開啟" : "複製失敗，請手動複製網址";
-      setTimeout(() => { pressSaveCopy.textContent = "⧉ 複製網址"; }, 2600);
-    });
-  }
 }
 
 // 手機一定提供獨立下載入口；分享與長按只作為額外選項。
@@ -1635,18 +1620,21 @@ function clearOmamoriDownload() {
   if (url) URL.revokeObjectURL(url);
   omamoriSave.removeAttribute("href");
   omamoriDownload = null;
+  syncImageShareButton(omamoriLine, null);
 }
 
 function setOmamoriDownload(file, date, render) {
   clearOmamoriDownload();
   omamoriSave.href = URL.createObjectURL(file);
   omamoriSave.download = file.name;
-  omamoriSave.textContent = isHandheld() ? "⤓ 儲存明信片 PNG" : "⤓ 下載明信片";
+  omamoriSave.textContent = "⤓ 下載明信片";
   omamoriDownload = { file, date, render };
+  syncImageShareButton(omamoriLine, file);
 }
 
 // 先合成圖檔，讓手機可在點擊當下叫出分享選單。
 async function prepareOmamoriFile(image, box, src, word, drawNumber) {
+  if (isAndroidLineBrowser()) return;
   const isCurrentDraw = () => drawNumber === omamoriServed && omamoriOverlay.classList.contains("show");
   try {
     const note = document.getElementById("omamoriNote").textContent.trim();
@@ -1680,6 +1668,7 @@ function currentOmamoriFile() {
 
 // 瀏覽器預設的下載（存到預設下載資料夾）
 function omamoriFallbackDownload(file) {
+  if (isAndroidLineBrowser()) return;
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
@@ -1714,7 +1703,18 @@ async function saveOmamoriAs(file) {
 }
 
 if (omamoriSave) {
+  omamoriLine.addEventListener("click", () => {
+    try {
+      sharePreparedImageFile(currentOmamoriFile(), omamoriLine);
+    } catch {
+      showToast("明信片準備失敗，請再試一次");
+    }
+  });
   omamoriSave.addEventListener("click", (e) => {
+    if (isAndroidLineBrowser()) {
+      e.preventDefault();
+      return;
+    }
     let file;
     try {
       file = currentOmamoriFile();
@@ -1804,13 +1804,34 @@ function omamoriFlightStart() {
    視窗一關按鈕就不在畫面上了，getBoundingClientRect() 會全部變成 0，飛機會從左上角起飛。
 
    只有這顆按鈕會放飛機：按右上角的 × 或點背景關掉是「跳過」，不給這個收尾。 */
+let homeArrivalAnimation = null;
+
+function emphasizeHomeTile(tile) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (homeArrivalAnimation) homeArrivalAnimation.cancel();
+  const current = getComputedStyle(tile).transform;
+  const base = current === "none" ? "scale(1)" : current;
+  homeArrivalAnimation = tile.animate([
+    { transform: base, offset: 0 },
+    { transform: `${base} scale(1.38)`, offset: 0.4 },
+    { transform: base, offset: 1 },
+  ].map((frame) => ({ ...frame, transformOrigin: "left bottom", zIndex: 5 })), {
+    duration: 1100,
+    easing: "ease-in-out",
+  });
+}
+
 function takeOmamori() {
   const r = omamoriClose.getBoundingClientRect();
   const from = omamoriFlightStart() || { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   closeOmamori();
   const startTile = document.querySelector(".tile.type-start");
   if (startTile && typeof flyPlaneTo === "function") {
-    flyPlaneTo(from, startTile, { arc: 0.32, playSound: (duration) => SFX.plane(duration) });
+    flyPlaneTo(from, startTile, {
+      arc: 0.32,
+      playSound: (duration) => SFX.plane(duration),
+      onDone: () => emphasizeHomeTile(startTile),
+    });
   }
 }
 
@@ -2072,11 +2093,29 @@ function syncInviteButtonLabel() {
   inviteSave.textContent = isHandheld() ? "⤓ 儲存邀請函 GIF" : "⤓ 下載邀請卡";
 }
 
+let inviteShareProbe = null;
+
+function syncInviteShareButton() {
+  // 用有效的小 GIF 立即判斷格式支援；完成後再以本次邀請函確認。
+  try {
+    if (!inviteShareProbe) {
+      const bytes = Uint8Array.from(atob("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"), c => c.charCodeAt(0));
+      inviteShareProbe = new File([bytes], "invite.gif", { type: "image/gif" });
+    }
+    const ready = !!inviteFile && !inviteDirty;
+    inviteLine.hidden = !canShareImageFile(ready ? inviteFile : inviteShareProbe);
+    inviteLine.disabled = !ready;
+  } catch {
+    inviteLine.hidden = true;
+  }
+}
+
 // 文字（或照片）換過了：現有的 GIF 作廢，正在做的那份就算做完也要丟掉。
 function invalidateInviteFile() {
   inviteDirty = true;
   inviteBuildToken += 1; // 正在跑的那份回來時 token 已經對不上，會自動作廢
   inviteBuilding = null;
+  syncInviteShareButton();
 }
 
 // 真正做 GIF。回傳的 promise 由「閒置時預做」和「使用者點下去」共用，同一份不會做兩次。
@@ -2093,6 +2132,8 @@ function startInviteBuild() {
     if (token !== inviteBuildToken) return inviteFile; // 做到一半文字又改了，這份不要了
     inviteFile = new File([blob], inviteFileName(personalName), { type: "image/gif" });
     inviteDirty = false;
+    syncInviteShareButton();
+    if (inviteOverlay.classList.contains("show")) fitInviteCard();
     return inviteFile;
   })();
   inviteBuilding = pending;
@@ -2123,12 +2164,13 @@ async function ensureInviteFile({ silent = false } = {}) {
 // 只會默默掉進最後的 <a download>，看起來就像「按了沒反應」。
 // 所以趁使用者沒在打字的空檔先把 GIF 做起來放著，按下去時就是現成的，授權還在。
 // 只在閒置時做：打字當下絕對不碰（見上面那段「越打越卡」的說明）。
-function warmInviteFile() {
+function warmInviteFile(delayMs = 700) {
   clearTimeout(inviteWarmTimer);
+  if (isAndroidLineBrowser()) return;
   inviteWarmTimer = setTimeout(() => {
     if (!inviteOverlay.classList.contains("show")) return;
     ensureInviteFile({ silent: true }).catch(() => {}); // 先做失敗沒關係，按下去還會再做一次
-  }, 700);
+  }, delayMs);
 }
 
 function openInvite({ defaultNote = "", placeImg = null } = {}) {
@@ -2174,7 +2216,7 @@ function openInvite({ defaultNote = "", placeImg = null } = {}) {
       if (!inviteOverlay.classList.contains("show")) return;
       fitInviteCard();
       startInvitePreviewAnim();
-      warmInviteFile(); // 照片到齊了，趁使用者還在看預覽先把 GIF 做好
+      warmInviteFile(0); // 首次開啟照片到齊就開始，輸入文字時仍保留防抖等待。
     });
 }
 
@@ -2210,6 +2252,9 @@ if (modalInviteCta) {
 }
 
 if (inviteBtn) {
+  inviteLine.addEventListener("click", () => {
+    sharePreparedImageFile(inviteDirty ? null : inviteFile, inviteLine);
+  });
   inviteBtn.addEventListener("click", () => openInvite());
   inviteX.addEventListener("click", closeInvite);
   inviteOverlay.addEventListener("click", (e) => {
@@ -2220,6 +2265,7 @@ if (inviteBtn) {
 
   inviteSave.addEventListener("click", async (e) => {
     e.preventDefault(); // 檔案是點了才現做，href 不會預先準備好，全程自己接管
+    if (isAndroidLineBrowser()) return;
     let file;
     try {
       file = await ensureInviteFile();
@@ -2733,6 +2779,7 @@ function startSnow() {
 }
 
 function init() {
+  syncDownloadBrowserUI();
   buildBoard();
   buildDice();
   startSnow();

@@ -1662,6 +1662,25 @@ body {
 .omamori-save:hover { transform: translateY(-2px); background: #fff; }
 .omamori-save:not([href]) { opacity: 0.45; pointer-events: none; }
 
+.omamori-save[hidden],
+.invite-save[hidden],
+.image-line-share[hidden],
+.press-save-download[hidden] { display: none; }
+
+.image-line-share {
+  padding: 11px 14px;
+  border: none;
+  border-radius: 999px;
+  background: #16823d;
+  color: #fff;
+  font: inherit;
+  font-size: clamp(12px, 3vw, 14px);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.image-line-share:disabled { opacity: 0.6; cursor: wait; }
+
 .omamori-close {
   padding: 11px 30px;
   border: none;
@@ -2040,10 +2059,11 @@ body {
   padding: 16px;
   z-index: 80;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition: opacity 0.25s ease;
 }
-.press-save-overlay.show { opacity: 1; pointer-events: auto; }
+.press-save-overlay.show { opacity: 1; visibility: visible; pointer-events: auto; }
 .press-save-card {
   position: relative;
   width: min(94vw, 460px);
@@ -2081,12 +2101,11 @@ body {
   color: var(--warm-ink);
 }
 .press-save-hint b { color: var(--gold); }
-.press-save-download,
-.press-save-share {
+.press-save-download {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  margin: 0 0 12px;
+  margin: 16px 0 0;
   padding: 13px 14px;
   border: 1px solid var(--accent-1);
   border-radius: 999px;
@@ -2101,10 +2120,7 @@ body {
   background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
   color: #fff;
 }
-.press-save-share[hidden] { display: none; }
-.press-save-share:disabled { opacity: 0.6; cursor: wait; }
-.press-save-download:focus-visible,
-.press-save-share:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.press-save-download:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .press-save-hint { line-height: 1.6; overflow-wrap: anywhere; }
 /* 複製網址：WebView 裡最可靠的出口是「換一個瀏覽器開」，所以這顆要顯眼 */
 .press-save-copy {
@@ -2150,7 +2166,6 @@ body {
   -webkit-touch-callout: default;
   -webkit-user-select: auto;
   user-select: auto;
-  pointer-events: auto;
 }
 .press-save-foot {
   margin: 12px 0 0;

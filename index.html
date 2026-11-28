@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=105">
+<link rel="stylesheet" href="style.css?v=111">
 </head>
 <body>
 
@@ -159,7 +159,8 @@
     </figure>
     <p class="omamori-note" id="omamoriNote">將常住真身之救度慧燈，傳承至立教百年</p>
     <div class="omamori-actions">
-      <a class="omamori-save" id="omamoriSave" download aria-live="polite">⤓ 下載明信片</a>
+      <a class="omamori-save" id="omamoriSave" download aria-live="polite" hidden>⤓ 下載明信片</a>
+      <button class="image-line-share" id="omamoriLine" type="button" hidden>line傳送明信片</button>
       <button class="omamori-close" id="omamoriClose">收下御守</button>
     </div>
   </div>
@@ -171,17 +172,9 @@
     <button class="press-save-x" id="pressSaveX" aria-label="關閉">×</button>
     <h2 class="press-save-title" id="pressSaveTitle">儲存圖片檔案</h2>
     <p class="press-save-hint" id="pressSaveInfo"></p>
-    <a class="press-save-download" id="pressSaveDownload" download>⤓ 下載檔案</a>
-    <button class="press-save-share" id="pressSaveShare" type="button" hidden>分享檔案</button>
-    <p class="press-save-hint" id="pressSaveStatus" role="status">
-      Android：下載後到「檔案 → 下載（Download）」查看。相簿未顯示時，可用檔案 App 將圖片複製到「Pictures」資料夾。
-    </p>
-    <p class="press-save-or">若從 LINE、Facebook 等 App 開啟，下載沒有反應，請用選單「以其他瀏覽器開啟」改用 Chrome，再重新製作並下載。</p>
-    <button class="press-save-copy" id="pressSaveCopy" type="button">⧉ 複製網址</button>
-    <!-- 剪貼簿 API 在 WebView 裡常常被擋，所以網址也直接攤出來讓使用者自己選取 -->
-    <p class="press-save-url" id="pressSaveUrl"></p>
     <img class="press-save-img" id="pressSaveImg" alt="待儲存的圖片預覽">
-    <p class="press-save-foot">iPhone／iPad 可點「分享檔案」，再選系統提供的儲存選項。長按預覽圖片僅為備用方式；網頁無法確認是否已存入相簿。</p>
+    <a class="press-save-download" id="pressSaveDownload" download hidden>⤓ 下載檔案</a>
+    <p class="press-save-hint" id="pressSaveStatus" role="status"></p>
   </div>
 </div>
 
@@ -217,7 +210,8 @@
 
     <!-- 手機開啟檔案儲存視窗，電腦直接存檔。 -->
     <div class="invite-actions">
-      <a class="invite-save" id="inviteSave" download aria-live="polite">⤓ 下載邀請卡</a>
+      <a class="invite-save" id="inviteSave" download aria-live="polite" hidden>⤓ 下載邀請卡</a>
+      <button class="image-line-share" id="inviteLine" type="button" hidden>LINE 傳送圖片</button>
     </div>
   </div>
 </div>
@@ -244,6 +238,6 @@
 <script src="temples.js?v=2"></script>
 <script src="invite-return-anim.js?v=8"></script>
 <script src="plane-flight.js?v=9"></script>
-<script src="script.js?v=111"></script>
+<script src="script.js?v=120"></script>
 </body>
 </html>
