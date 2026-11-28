@@ -2028,3 +2028,78 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .plane-land-ring { display: none; }
 }
+
+/* ---------- 長按存圖（App 內建瀏覽器專用） ----------
+   LINE／FB／IG 開出來的 WebView 沒有 navigator.share，<a download> 配 blob: 又完全無效，
+   按下去不會有任何反應。那裡唯一還能把圖存進相簿的方式，就是讓使用者長按圖片，
+   用系統自己的「下載圖片」選單存。這個視窗就是把那張圖好好地攤開給他長按。
+   疊在御守視窗（z-index 55）上面，所以要更高。 */
+.press-save-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 24, 12, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 80;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.press-save-overlay.show { opacity: 1; pointer-events: auto; }
+.press-save-card {
+  position: relative;
+  width: min(94vw, 460px);
+  max-height: 94vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(18px, 4vw, 24px);
+  border-radius: 22px;
+  background: linear-gradient(170deg, #fffbf4, #ffeedb);
+  box-shadow: 0 24px 60px rgba(var(--shadow-rgb), 0.4);
+  text-align: center;
+}
+.press-save-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(var(--warm-ink-rgb), 0.08);
+  color: var(--warm-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.press-save-title {
+  margin: 0 0 6px;
+  font-size: clamp(17px, 4.4vw, 21px);
+  color: var(--gold);
+}
+.press-save-hint {
+  margin: 0 0 12px;
+  font-size: clamp(13px, 3.4vw, 15px);
+  color: var(--warm-ink);
+}
+.press-save-hint b { color: var(--gold); }
+/* 長按要叫得出系統選單，圖片就不能被這些屬性擋住 */
+.press-save-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(var(--shadow-rgb), 0.28);
+  -webkit-touch-callout: default;
+  -webkit-user-select: auto;
+  user-select: auto;
+  pointer-events: auto;
+}
+.press-save-foot {
+  margin: 12px 0 0;
+  font-size: clamp(11px, 3vw, 13px);
+  color: rgba(var(--warm-ink-rgb), 0.7);
+  line-height: 1.5;
+}

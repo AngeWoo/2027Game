@@ -404,6 +404,9 @@ const omamoriStage = document.getElementById("omamoriStage");
 const omamoriImg = document.getElementById("omamoriImg");
 const omamoriClose = document.getElementById("omamoriClose");
 const omamoriSave = document.getElementById("omamoriSave");
+const pressSaveOverlay = document.getElementById("pressSaveOverlay");
+const pressSaveImg = document.getElementById("pressSaveImg");
+const pressSaveX = document.getElementById("pressSaveX");
 const omamoriX = document.getElementById("omamoriX");
 const omamoriCountEl = document.getElementById("omamoriCount");
 const omamoriWordText = document.getElementById("omamoriWordText");
@@ -1474,8 +1477,66 @@ function isHandheld() {
 }
 
 // 網頁不能自己寫進相簿，但手機的分享選單裡就有「儲存影像」，按下去就是存進相簿
-function canSaveToAlbum(file) {
+function canShareToAlbum(file) {
   return !!file && isHandheld() && !!navigator.canShare && navigator.canShare({ files: [file] });
+}
+
+/* 長按存圖：給「叫不出系統分享選單」的手機用，主要是 App 內建瀏覽器
+   （LINE、Facebook、IG 點網址開出來的 WebView）。那種環境有兩個坑疊在一起：
+     1. 沒有 navigator.share，所以走不到分享選單那條路；
+     2. <a download> 配 blob: 在 WebView 裡不會觸發下載，按下去「完全沒有反應」，
+        使用者回報的「出現下載但無法下載、相簿裡也沒看到」就是這個。
+   那裡唯一還能把圖存進相簿的方式，是讓使用者長按圖片、用系統自己的選單存，
+   所以把圖攤開成一張夠大的 <img> 並寫清楚怎麼做。
+   圖片用 data: URL 而不是 blob:——WebView 的「儲存圖片」對 blob: 一樣常常失敗。 */
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("讀取失敗"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function closePressToSave() {
+  if (!pressSaveOverlay) return;
+  pressSaveOverlay.classList.remove("show");
+  pressSaveImg.removeAttribute("src"); // data: URL 很大，關掉就放掉
+}
+
+async function showPressToSave(file) {
+  if (!pressSaveOverlay) {
+    omamoriFallbackDownload(file); // 沒有這個視窗就退回原本的做法
+    return;
+  }
+  try {
+    pressSaveImg.src = await fileToDataURL(file);
+  } catch {
+    showToast("圖片準備失敗，請再試一次");
+    return;
+  }
+  pressSaveOverlay.classList.add("show");
+}
+
+if (pressSaveOverlay) {
+  pressSaveX.addEventListener("click", closePressToSave);
+  pressSaveOverlay.addEventListener("click", (e) => {
+    // 只有點到背景才關；點在圖片上要留給「長按」，不能被關掉
+    if (e.target === pressSaveOverlay) closePressToSave();
+  });
+}
+
+/* 手機上存檔的統一出口：有分享選單就用分享選單，沒有就走長按存圖。
+   電腦不走這裡（電腦的 <a download> 是正常的）。 */
+function saveImageOnHandheld(file, shareTitle) {
+  if (canShareToAlbum(file)) {
+    navigator.share({ files: [file], title: shareTitle }).catch((err) => {
+      if (err && err.name === "AbortError") return; // 使用者自己關掉選單
+      showPressToSave(file); // 分享被拒就改走長按，不要退回那條在 WebView 行不通的下載
+    });
+    return;
+  }
+  showPressToSave(file);
 }
 
 let omamoriDownload = null;
@@ -1491,7 +1552,9 @@ function setOmamoriDownload(file, date, render) {
   clearOmamoriDownload();
   omamoriSave.href = URL.createObjectURL(file);
   omamoriSave.download = file.name;
-  omamoriSave.textContent = canSaveToAlbum(file) ? "⤓ 存到相簿" : "⤓ 下載明信片";
+  // 手機上兩條路（分享選單／長按存圖）最後都是存進相簿，所以標籤一致；
+  // 以前這裡寫「下載明信片」，但在 WebView 裡按了根本下載不了，標籤本身就是誤導。
+  omamoriSave.textContent = isHandheld() ? "⤓ 存到相簿" : "⤓ 下載明信片";
   omamoriDownload = { file, date, render };
 }
 
@@ -1577,13 +1640,10 @@ if (omamoriSave) {
       e.preventDefault();
       return;
     }
-    // 手機：叫出分享選單，按「儲存影像」就會進相簿
-    if (canSaveToAlbum(file)) {
+    // 手機：分享選單按「儲存影像」就進相簿；叫不出選單（App 內建瀏覽器）就走長按存圖
+    if (isHandheld()) {
       e.preventDefault();
-      navigator.share({ files: [file], title: "今日御守明信片" }).catch((err) => {
-        if (err && err.name === "AbortError") return; // 使用者自己關掉選單
-        omamoriFallbackDownload(file);
-      });
+      saveImageOnHandheld(file, "今日御守明信片");
       return;
     }
     // 電腦（Chrome／Edge）：自己挑存放目錄
@@ -2134,6 +2194,12 @@ if (window.visualViewport) window.visualViewport.addEventListener("resize", fitI
 // 分享不成（或這台裝置本來就不能分享）時的存檔出口：
 // Chrome／Edge 跳「另存新檔」讓使用者挑資料夾，其他瀏覽器就存到預設下載資料夾。
 function saveInviteFallback(file) {
+  // 手機沒走到系統分享（例如 App 內建瀏覽器）時，<a download> 一樣是無效的，
+  // 要走長按存圖，不然就會變成「按了沒反應、相簿裡也找不到」。
+  if (isHandheld()) {
+    saveImageOnHandheld(file, "寒修行邀請函");
+    return;
+  }
   if (window.showSaveFilePicker) saveInviteAs(file);
   else omamoriFallbackDownload(file);
 }

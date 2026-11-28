@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=102">
+<link rel="stylesheet" href="style.css?v=103">
 </head>
 <body>
 
@@ -165,6 +165,18 @@
   </div>
 </div>
 
+<!-- 長按存圖：給「叫不出系統分享選單」的 App 內建瀏覽器（LINE、FB、IG 開出來的 WebView）用。
+     那種環境 <a download> 按了不會有任何反應，長按圖片用系統選單存才是唯一能進相簿的路。 -->
+<div class="press-save-overlay" id="pressSaveOverlay">
+  <div class="press-save-card" role="dialog" aria-modal="true" aria-labelledby="pressSaveTitle" tabindex="-1">
+    <button class="press-save-x" id="pressSaveX" aria-label="關閉">×</button>
+    <h2 class="press-save-title" id="pressSaveTitle">長按圖片存進相簿</h2>
+    <p class="press-save-hint">在下面的圖片上<b>長按</b>，選「下載圖片」或「儲存圖片」。</p>
+    <img class="press-save-img" id="pressSaveImg" alt="長按這張圖片即可儲存">
+    <p class="press-save-foot">長按沒反應的話，用右上角選單的「以其他瀏覽器開啟」再存一次。</p>
+  </div>
+</div>
+
 <!-- 發送邀請函：寫自己的話和名字，生成邀請卡分享出去（不用密碼） -->
 <div class="invite-overlay" id="inviteOverlay">
   <div class="invite-card" id="inviteCard" role="dialog" aria-modal="true" aria-labelledby="inviteTitle" tabindex="-1">
@@ -226,6 +238,6 @@
 <script src="temples.js?v=2"></script>
 <script src="invite-return-anim.js?v=8"></script>
 <script src="plane-flight.js?v=9"></script>
-<script src="script.js?v=108"></script>
+<script src="script.js?v=109"></script>
 </body>
 </html>
