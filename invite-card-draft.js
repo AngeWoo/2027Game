@@ -16,7 +16,8 @@ function loadInviteTitleImage(src = "invite-title-hanshugyo.png") {
   });
 }
 
-function loadInviteQrImage(src = "invite-qr.png") {
+// ?v=2：2026-11-28 整張圖換過（容錯 L、29×29、含 2 格留白），不帶版本號會吃到舊的快取
+function loadInviteQrImage(src = "invite-qr.png?v=2") {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
@@ -54,7 +55,7 @@ function renderInviteCardDraft(opts = {}) {
     ],
     seal = "敬邀",
     yearLabel = "2027寒修行",
-    gameLabel = "真如世界大冒險・GO",
+    gameLabel = "真如世界大冒險 Going",
     cta = "歡迎參觀",
     titleFont = '"Long Cang"',
     titleImage = null, // 去背後的「寒修行」毛筆字圖檔（loadInviteTitleImage 的結果）
@@ -312,7 +313,8 @@ function renderInviteCardDraft(opts = {}) {
   bodyLines.forEach((line, i) => ctx.fillText(line, textX, bodyTop + i * lineHeight));
 
   // ---------- 時間表：開白／中願／結願，橫排三段，中間用細線隔開 ----------
-  const schedTop = bodyTop + (bodyLines.length - 1) * lineHeight + 56;
+  // 56 → 44：左下角要讓出 110px 給放大後的 QR，時間表整排往上挪 12px。
+  const schedTop = bodyTop + (bodyLines.length - 1) * lineHeight + 44;
   const schedDateY = schedTop + 29;
   const schedColW = (W - textX * 2) / schedule.length;
   schedule.forEach((item, i) => {
@@ -360,43 +362,74 @@ function renderInviteCardDraft(opts = {}) {
 
   // ---------- 底部資訊列 ----------
   const footerY = 558;
+
+  /* QR 從右下角那顆 58px，換成左下角 110px 的一塊。
+     原本那顆根本掃不出來：縮到 540 寬的 GIF 之後只剩 0.85 像素／模組——
+     模組比一個像素還小，重新取樣時直接被抹平，等於畫了一個長得像 QR 的裝飾。
+     搬到左下角是因為右下角被「敬邀」印章佔住（圓心 812、半徑 58），放不下。
+     invite-qr.png 也一起重做了：同一個網址，容錯等級從 H 降到 L，
+     格數 41×41 → 29×29，左右各 2 格留白已經畫進圖裡，所以整張圖是 33 格寬。 */
+  const QR_CELLS = 33; // invite-qr.png 的總格數（29 格資料 + 左右各 2 格留白）
+  const qrBox = 110;   // 左下角塞得下的最大尺寸：上面讓開時間表，下面壓到海浪紋上緣
+  const qrX = textX;
+  const qrY = footerY - 92;
+  const infoX = qrX + qrBox + 26; // 年份和遊戲名讓到 QR 右邊
+
   ctx.strokeStyle = "rgba(243, 199, 107, 0.4)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(textX, footerY - 36);
+  ctx.moveTo(infoX, footerY - 36);
   ctx.lineTo(W - 72, footerY - 36);
   ctx.stroke();
 
   ctx.fillStyle = "rgba(243, 199, 107, 0.85)";
   ctx.font = `13px ${sans}`;
-  ctx.fillText(yearLabel, textX, footerY - 14);
+  ctx.fillText(yearLabel, infoX, footerY - 14);
   ctx.fillStyle = "#fdf8ee";
   ctx.font = `bold 18px ${sans}`;
-  ctx.fillText(gameLabel, textX, footerY + 10);
+  ctx.fillText(gameLabel, infoX, footerY + 10);
 
-  // CTA ＋ QR code
-  const qrSize = 58;
-  const qrX = W - 72 - qrSize;
-  const qrY = footerY - 30;
+  ctx.textAlign = "right";
+  ctx.fillStyle = goldLight;
+  ctx.font = `bold 16px ${sans}`;
+  ctx.fillText(cta, W - 72, footerY + 10);
+  ctx.textAlign = "left";
+
+  // QR code
   if (qrImage && qrImage.naturalWidth) {
+    /* 重點是「一個模組要剛好佔整數個輸出像素」。
+       GIF 走 pixelScale=0.6（540 寬），110×0.6 = 66 = 33 格 × 2 像素，剛好整除；
+       但只要尺寸被改過就可能變成 1.9 像素／模組，而 imageSmoothingEnabled=false
+       是最近鄰取樣，會把模組畫成有的 2px、有的 1px——寬窄不一的模組比單純模糊更難掃。
+       所以先取整數的每模組像素，再回推實際要畫多大；位置也對齊到輸出像素格，
+       不然整張圖落在半個像素上，一樣會被重新取樣糊掉。 */
+    const rawPerModule = (qrBox * pixelScale) / QR_CELLS;
+    // 每模組有 3 個像素以上時，差個半像素不影響辨識，就照原尺寸畫，
+    // 預覽（pixelScale 1／2）和 GIF（0.6）的構圖才會一模一樣；
+    // 只有在像素真的吃緊時（GIF 剛好是 2 像素／模組）才去遷就整數。
+    const perModule = rawPerModule >= 3 ? rawPerModule : Math.max(1, Math.round(rawPerModule));
+    const drawSize = (perModule * QR_CELLS) / pixelScale;
+    const dx = Math.round(qrX * pixelScale) / pixelScale;
+    const dy = Math.round(qrY * pixelScale) / pixelScale;
+    const pad = 7;
     ctx.fillStyle = "#fdf8ee";
-    ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
+    ctx.fillRect(dx - pad, dy - pad, drawSize + pad * 2, drawSize + pad * 2);
     ctx.save();
-    ctx.imageSmoothingEnabled = false; // 原圖是 400×400，縮小時保持模組邊緣銳利，才掃得到
-    ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+    ctx.imageSmoothingEnabled = false; // 模組邊緣要銳利，不能讓瀏覽器做平滑內插
+    ctx.drawImage(qrImage, dx, dy, drawSize, drawSize);
     ctx.restore();
     ctx.strokeStyle = "rgba(253, 248, 238, 0.9)";
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
+    ctx.strokeRect(dx - pad, dy - pad, drawSize + pad * 2, drawSize + pad * 2);
   } else {
     ctx.strokeStyle = "rgba(253, 248, 238, 0.75)";
     ctx.lineWidth = 2;
-    const corner = 10;
+    const corner = 16;
     for (const [cx, cy, dx, dy] of [
       [qrX, qrY, 1, 1],
-      [qrX + qrSize, qrY, -1, 1],
-      [qrX, qrY + qrSize, 1, -1],
-      [qrX + qrSize, qrY + qrSize, -1, -1],
+      [qrX + qrBox, qrY, -1, 1],
+      [qrX, qrY + qrBox, 1, -1],
+      [qrX + qrBox, qrY + qrBox, -1, -1],
     ]) {
       ctx.beginPath();
       ctx.moveTo(cx, cy + corner * dy);
@@ -405,16 +438,11 @@ function renderInviteCardDraft(opts = {}) {
       ctx.stroke();
     }
     ctx.fillStyle = "rgba(253, 248, 238, 0.6)";
-    ctx.font = `11px ${sans}`;
+    ctx.font = `13px ${sans}`;
     ctx.textAlign = "center";
-    ctx.fillText("QR", qrX + qrSize / 2, qrY + qrSize / 2 + 4);
+    ctx.fillText("QR", qrX + qrBox / 2, qrY + qrBox / 2 + 5);
     ctx.textAlign = "left";
   }
-  ctx.textAlign = "right";
-  ctx.fillStyle = goldLight;
-  ctx.font = `bold 16px ${sans}`;
-  ctx.fillText(cta, qrX - 14, footerY + 2);
-  ctx.textAlign = "left";
 
   return canvas;
 }
@@ -426,19 +454,25 @@ function renderInviteCardDraft(opts = {}) {
 
    每畫完一幀都用 setTimeout(0) 讓出主執行緒一下，不要 8 幀連著畫、整段把主執行緒佔住——
    這段如果連續卡住一兩百毫秒，使用者剛好在這段時間打字（尤其是用注音／拼音選字）
-   就會被打斷，嚴重時輸入法會把還沒選定、甚至剛選定的字弄丟。 */
-async function buildInviteGif(opts = {}, { frames = 6, delayMs = 130 } = {}) {
+   就會被打斷，嚴重時輸入法會把還沒選定、甚至剛選定的字弄丟。
+
+   輸出 540×360（跟「回到親苑」那支 GIF 同尺寸）：實測 1022KB → 363KB，
+   小字（日期那行）在 540 寬還看得清楚。
+   注意是直接用 pixelScale=0.6 原生畫在 540×360 上，不是畫完 900×600 再縮——
+   縮圖那一步會做平滑內插，字糊一層，卡片上的 QR 更是會被抹平到掃不出來。 */
+async function buildInviteGif(opts = {}, { frames = 6, delayMs = 130, width = 540, height = 360 } = {}) {
   if (typeof GIF !== "function") throw new Error("gif.js 沒有載入");
   const gif = new GIF({
     workers: 2,
     quality: 14,
-    width: 900,
-    height: 600,
+    width,
+    height,
     workerScript: "gif.worker.js",
     repeat: 0, // 不停循環
   });
+  const pixelScale = width / 900;
   for (let i = 0; i < frames; i++) {
-    const canvas = renderInviteCardDraft({ ...opts, pixelScale: 1, flap: i / frames });
+    const canvas = renderInviteCardDraft({ ...opts, pixelScale, flap: i / frames });
     gif.addFrame(canvas, { delay: delayMs, copy: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
   }

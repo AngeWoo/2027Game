@@ -375,8 +375,14 @@ async function pickReturnPhotos(placeImage, loadImage) {
    repeat:-1 ＝ 只播一次，所以播完就停在最後一幀，而最後一幀就是親苑 —— 不會跳回開頭。
    最後一幀另外給一段長停留，萬一遇到不理會 repeat 設定、硬要循環播的看圖程式，
    畫面也會有大半時間停在親苑上。
-   尺寸預設縮到 600×400：900×600 的檔案會到 3.7MB，縮一半大約 2MB，手機上看沒差。 */
-async function buildReturnGif(opts, photos, { frames = 24, delayMs = 150, holdMs = 1500, width = 600, height = 400 } = {}) {
+   檔案大小幾乎正比於「像素數 × 幀數」，所以瘦身就從這兩個地方下手（實測，同一張卡）：
+     900×600 24幀 ≈ 3.7MB ／ 600×400 24幀 ≈ 2.0MB ／ 540×360 20幀 ≈ 1.4MB
+   再往下 480×320 雖然只有 1.1MB，但卡片上「1/20(三)～1/24(日)」那行日期就糊掉了，
+   所以 540×360 是保持小字還看得清的底線。
+   幀數 24→20 的同時把每幀 150ms 拉長到 180ms，整段動畫長度維持原本約 3.4 秒，
+   節奏不變，只是取樣點少了四個。
+   編碼器參數（quality、globalPalette）實測最多只差 5%，又會拖慢編碼，所以不動。 */
+async function buildReturnGif(opts, photos, { frames = 20, delayMs = 180, holdMs = 1500, width = 540, height = 360 } = {}) {
   if (typeof GIF !== "function") throw new Error("gif.js 沒有載入");
   const gif = new GIF({
     workers: 2,
@@ -386,22 +392,15 @@ async function buildReturnGif(opts, photos, { frames = 24, delayMs = 150, holdMs
     workerScript: "gif.worker.js",
     repeat: -1,
   });
-  const scratch = (width !== 900 || height !== 600) ? document.createElement("canvas") : null;
-  if (scratch) {
-    scratch.width = width;
-    scratch.height = height;
-  }
+  // 直接用輸出解析度畫每一幀，不要先畫 900×600 再縮小。
+  // 以前是畫完整張再 drawImage 縮圖，那一步是會做平滑內插的重新取樣：
+  // 文字會糊一層，卡片上的 QR 更是直接被抹平。改成原生描繪之後，
+  // 字是照 540 寬去排版光柵化的（比縮圖銳利），QR 也能維持整數像素的模組寬度。
+  const pixelScale = width / 900;
   for (let i = 0; i < frames; i++) {
     const last = i === frames - 1;
     // i/(frames-1) 讓最後一幀剛好落在 t=1，也就是完全定格的親苑
-    const full = renderReturnFrame(Object.assign({}, opts, { pixelScale: 1 }), photos, i / (frames - 1));
-    let frame = full;
-    if (scratch) {
-      const sctx = scratch.getContext("2d");
-      sctx.clearRect(0, 0, width, height);
-      sctx.drawImage(full, 0, 0, width, height);
-      frame = scratch;
-    }
+    const frame = renderReturnFrame(Object.assign({}, opts, { pixelScale }), photos, i / (frames - 1));
     gif.addFrame(frame, { delay: last ? holdMs : delayMs, copy: true });
     // 每畫完一幀讓出主執行緒，不要整段卡住、把使用者正在打的字吃掉
     await new Promise((resolve) => setTimeout(resolve, 0));

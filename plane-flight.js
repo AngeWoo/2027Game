@@ -63,8 +63,8 @@ function flyPlaneTo(from, to, opts = {}) {
   const {
     arc = 0.32,
     duration = 5000,
-    startSize = 86,
-    endSize = 30,
+    startSize = 170,
+    endSize = 120,
     fadeFrom = 0.72, // 飛到幾成之後開始淡出
     landRing = true,
     playSound = null,
@@ -84,7 +84,7 @@ function flyPlaneTo(from, to, opts = {}) {
   const c = arcControl(p0, p2, arc);
 
   // 飛機 SVG 的 viewBox 是 72x40，所以實際高度 = 寬度 x (40/72)。
-  // 垂直置中要用真正的半高，用寬度的一半會讓整架往上偏約 19px，
+  // 垂直置中要用真正的半高，用寬度的一半會讓整架往上偏將近三成機身高，
   // 起點就不會剛好落在「收下御守」按鈕上。
   const PLANE_RATIO = 40 / 72;
 
@@ -98,7 +98,7 @@ function flyPlaneTo(from, to, opts = {}) {
   // 文字另外定位，保持水平可讀，不跟著往左飛的機身鏡射。
   const label = document.createElement("span");
   label.className = "plane-flight-label";
-  label.textContent = "回歸親苑";
+  label.textContent = "回歸親苑-親苑號";
   label.setAttribute("aria-hidden", "true");
   document.body.appendChild(label);
   const stopSound = playSound ? playSound(duration) : null;

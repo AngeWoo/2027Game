@@ -850,7 +850,10 @@ body {
 
 /* 精舍小卡：照片＋國家洲別 */
 .modal-temple {
-  margin: 0 0 clamp(14px, 3vw, 22px);
+  /* 底下緊接著「邀朋友」那顆按鈕，間距留太多會在照片和按鈕之間空出一條帶子，
+     所以這裡收到只剩分隔用的最小間距；按鈕自己的 margin-top 設 0，
+     相鄰 margin 會合併成兩者的最大值，只改一邊是推不上去的。 */
+  margin: 0 0 clamp(4px, 1.2vw, 8px);
   text-align: left;
 }
 .modal-temple[hidden] { display: none; }
@@ -887,7 +890,7 @@ body {
   display: block;
   width: fit-content;
   max-width: 100%;
-  margin: clamp(10px, 2.5vw, 16px) auto 0;
+  margin: 0 auto;
   padding: 8px 20px;
   border: 1.5px solid rgba(var(--gold-rgb), 0.5);
   border-radius: 999px;
@@ -1990,7 +1993,7 @@ body {
   z-index: 70;
   pointer-events: none;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: 2px;

@@ -961,6 +961,9 @@ const mapFrame = document.getElementById("mapFrame");
 const mapX = document.getElementById("mapX");
 
 function placeMapQuery(place) {
+  // mapq 是官網查到的實際地址（見 temples.js），有就直接用，Google 地圖才會釘在正確位置。
+  // 沒有 mapq 的話才退回「名稱＋國家」去搜，但那常常只會停在國家中心。
+  if (place.mapq) return place.mapq;
   return [place.name, place.country].filter(Boolean).join(" ");
 }
 
@@ -1368,7 +1371,7 @@ function drawOmamori() {
 function omamoriFileName(src) {
   const i = OMAMORI_ENTRIES.findIndex((entry) => entry.src === src);
   const no = String(i >= 0 ? i + 1 : 0).padStart(2, "0");
-  return `真如世界大冒險·GO_御守明信片_${no}.png`;
+  return `真如世界大冒險 Going_御守明信片_${no}.png`;
 }
 
 // 手機／平板？有 userAgentData 就問它，沒有就看是不是觸控裝置（iOS Safari 走這條）
@@ -1588,6 +1591,8 @@ let invitePlaceImage = null; // 從「邀朋友」按鈕帶過來的當地照片
 let inviteFile = null; // 目前已經做好、可以直接用的 GIF 檔
 let inviteDirty = true; // 文字改過、還沒重做 GIF
 let inviteBuildToken = 0; // 每次做 GIF +1，讓做到一半又被取代的結果自動作廢
+let inviteBuilding = null; // 正在做的那一份 GIF（閒置預做跟使用者點擊共用，不會做兩次）
+let inviteWarmTimer = null; // 閒置多久之後開始偷偷預做 GIF
 let invitePreviewTimer = null; // 靜態預覽圖的 debounce（只是重畫一次 canvas，不編碼）
 let invitePhotos = null; // 「回到親苑」要用的五張照片（見 invite-return-anim.js），每次打開重抽
 let invitePhotoToken = 0; // 連續開關兩次時，讓前一次還在載的照片自動作廢
@@ -1799,13 +1804,15 @@ function startInvitePreviewAnim() {
 // 打字的當下把輪播停掉，只用原本的 debounce 重畫一張，讓剛打的字馬上看得到；
 // 停手之後再把動畫接回去。這是照原本檔案的設計意圖做的：輸入框全程不跟任何背景工作搶。
 function queueInvitePreview() {
-  inviteDirty = true;
+  invalidateInviteFile();
   stopInvitePreviewAnim();
+  clearTimeout(inviteWarmTimer);
   clearTimeout(invitePreviewResumeTimer);
   clearTimeout(invitePreviewTimer);
   invitePreviewTimer = setTimeout(() => {
     drawInvitePreviewOnce();
     invitePreviewResumeTimer = setTimeout(startInvitePreviewAnim, 450);
+    warmInviteFile(); // 停手之後才把 GIF 先做起來放著
   }, 250);
 }
 
@@ -1823,30 +1830,37 @@ function canSystemShareFiles() {
   }
 }
 
-// 裝置是否叫得出手機那種「分享選單」——跟實際檔案內容無關，先用一個假檔案探一次就好，
-// 這樣按鈕文字一開始就能顯示對的字，不用等真正的 GIF 做完。
-function canShareInviteFiles() {
-  try {
-    return canSaveToAlbum(new File([new Uint8Array([0])], "p.gif", { type: "image/gif" }));
-  } catch {
-    return false;
-  }
+// 要不要把事情交給系統分享面板。
+//
+// 2026-11-28 改回只在手機／平板走分享：Windows 的分享面板「列得出」LINE
+// （Store 版 LINE 的 manifest 確實宣告了 windows.shareTarget），canShare() 也回 true，
+// 但實測點下去檔案並沒有真的進到 LINE 對話，等於按了沒反應；
+// 而且那時電腦上只剩這一條路——存檔和「用 LINE 傳送」兩顆按鈕都被藏起來了，
+// 使用者變成既存不了圖也傳不出去。所以電腦一律走「下載 ＋ 剪貼簿開 LINE」這條確定可行的路。
+// canSystemShareFiles() 本身留著，是因為手機上還是要先確認面板吃得下檔案。
+function useSystemShare() {
+  return isHandheld() && canSystemShareFiles();
 }
 
 function syncInviteButtonLabel() {
-  const canShareSheet = canShareInviteFiles();
-  inviteSave.textContent = canShareSheet ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
-  // 手機叫得出分享選單時就不用另外給「用 LINE 傳送」，分享選單裡就有 LINE
-  if (inviteLine) inviteLine.hidden = canShareSheet;
+  const canShare = useSystemShare();
+  inviteSave.textContent = canShare ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
+  // 手機的分享選單裡就有 LINE，再放一顆「用 LINE 傳送」只是讓人多按一次；
+  // 電腦沒有這條捷徑，那顆按鈕要留著，不然就真的沒有辦法傳給 LINE 了。
+  if (inviteLine) inviteLine.hidden = canShare;
 }
 
-// 真正做 GIF：只在按下分享／下載按鈕的那一刻呼叫。已經做好、文字又沒改過就直接重複用。
-async function ensureInviteFile() {
-  if (inviteFile && !inviteDirty) return inviteFile;
+// 文字（或照片）換過了：現有的 GIF 作廢，正在做的那份就算做完也要丟掉。
+function invalidateInviteFile() {
+  inviteDirty = true;
+  inviteBuildToken += 1; // 正在跑的那份回來時 token 已經對不上，會自動作廢
+  inviteBuilding = null;
+}
+
+// 真正做 GIF。回傳的 promise 由「閒置時預做」和「使用者點下去」共用，同一份不會做兩次。
+function startInviteBuild() {
   const token = ++inviteBuildToken;
-  const label = inviteSave.textContent;
-  inviteSave.textContent = "製作動畫中…";
-  try {
+  const pending = (async () => {
     const assets = await getInviteAssets();
     const personalNote = inviteNote.value.trim();
     const personalName = inviteName.value.trim();
@@ -1854,14 +1868,45 @@ async function ensureInviteFile() {
     const blob = invitePhotos
       ? await buildReturnGif(cardOpts, invitePhotos)
       : await buildInviteGif({ ...cardOpts, placeImage: invitePlaceImage }); // 照片沒載到就退回原本只有仙鶴拍翅的版本
-    if (token !== inviteBuildToken) return inviteFile; // 這份還沒做完，使用者又點了一次，用最新那份就好
+    if (token !== inviteBuildToken) return inviteFile; // 做到一半文字又改了，這份不要了
     inviteFile = new File([blob], inviteFileName(personalName), { type: "image/gif" });
     inviteDirty = false;
     return inviteFile;
+  })();
+  inviteBuilding = pending;
+  pending.catch(() => {}).then(() => {
+    if (inviteBuilding === pending) inviteBuilding = null; // 別把後來那份蓋掉
+  });
+  return pending;
+}
+
+// silent = 閒置時偷偷先做，不動按鈕上的字（不然使用者什麼都沒按就看到「製作動畫中…」）
+async function ensureInviteFile({ silent = false } = {}) {
+  if (inviteFile && !inviteDirty) return inviteFile;
+  const pending = inviteBuilding || startInviteBuild();
+  if (silent) return pending;
+  const label = inviteSave.textContent;
+  inviteSave.textContent = "製作動畫中…";
+  try {
+    return await pending;
   } catch {
-    if (token === inviteBuildToken) inviteSave.textContent = label;
+    inviteSave.textContent = label;
     throw new Error("邀請卡製作失敗");
   }
+}
+
+// navigator.share() 和 showSaveFilePicker() 都要求「使用者剛剛才點過」（Chrome 只給約 5 秒）。
+// 這張 GIF 有 2MB、24 幀，在慢一點的手機上要好幾秒才做得完，等按下去才開始做，
+// 做完時那個授權早就過期了 —— 分享選單叫不出來、另存視窗也跳不出來，
+// 只會默默掉進最後的 <a download>，看起來就像「按了沒反應」。
+// 所以趁使用者沒在打字的空檔先把 GIF 做起來放著，按下去時就是現成的，授權還在。
+// 只在閒置時做：打字當下絕對不碰（見上面那段「越打越卡」的說明）。
+function warmInviteFile() {
+  clearTimeout(inviteWarmTimer);
+  inviteWarmTimer = setTimeout(() => {
+    if (!inviteOverlay.classList.contains("show")) return;
+    ensureInviteFile({ silent: true }).catch(() => {}); // 先做失敗沒關係，按下去還會再做一次
+  }, 700);
 }
 
 // 複製到剪貼簿用的靜態 PNG：剪貼簿圖片格式幾乎只認 image/png，GIF 不能用，
@@ -1908,7 +1953,7 @@ function openInvite({ defaultNote = "", placeImg = null } = {}) {
   inviteName.name = `inviteName_${rnd}`;
   inviteNote.value = defaultNote;
   inviteName.value = "";
-  inviteDirty = true;
+  invalidateInviteFile();
   invitePlaceImage = null; // 先清掉上一次的照片，等這次的（如果有）載完再換上
   invitePhotos = null;
   inviteOverlay.classList.add("show");
@@ -1937,11 +1982,12 @@ function openInvite({ defaultNote = "", placeImg = null } = {}) {
     .then((photos) => {
       if (token !== invitePhotoToken || !photos) return;
       invitePhotos = photos;
-      inviteDirty = true;
+      invalidateInviteFile();
       updateInviteRoute();
       if (!inviteOverlay.classList.contains("show")) return;
       fitInviteCard();
       startInvitePreviewAnim();
+      warmInviteFile(); // 照片到齊了，趁使用者還在看預覽先把 GIF 做好
     });
 }
 
@@ -1952,6 +1998,7 @@ function closeInvite() {
   inviteOverlay.classList.remove("show");
   SFX.click();
   stopInvitePreviewAnim();
+  clearTimeout(inviteWarmTimer);
   clearTimeout(invitePreviewResumeTimer);
   clearTimeout(invitePreviewTimer);
   if (inviteReturnTile) {
@@ -1995,51 +2042,27 @@ if (inviteBtn) {
       return;
     }
     syncInviteButtonLabel();
-    // 手機：叫出分享選單，LINE 就在裡面，點了直接傳
-    if (canSaveToAlbum(file)) {
+    if (!file) {
+      showToast("邀請卡製作失敗，請再試一次");
+      return;
+    }
+    // 手機／平板交給系統分享選單（裡面就有 LINE）；電腦走下面的存檔那條。
+    if (useSystemShare()) {
       SFX.click();
       navigator.share({ files: [file], title: "寒修行邀請函" }).catch((err) => {
         if (err && err.name === "AbortError") return; // 使用者自己關掉選單
-        omamoriFallbackDownload(file);
+        saveInviteFallback(file); // 分享被拒（例如授權過期）就至少把檔案存下來
       });
       return;
     }
-    // 電腦（Chrome／Edge）：自己挑存放目錄；其他瀏覽器就直接存到預設下載資料夾
-    if (window.showSaveFilePicker) {
-      saveInviteAs(file);
-    } else {
-      omamoriFallbackDownload(file);
-    }
+    saveInviteFallback(file);
   });
 
-  // 電腦沒有手機那種「分享選單」，LINE 也沒開放讓網頁直接把圖片塞進對話——
-  // 能做到的是：開啟 LINE 並帶入祝福文字，圖片用上面存好的那張，使用者自己在 LINE 裡附加。
+  // 這顆按鈕在電腦（以及叫不出系統分享面板的裝置）上出現（見 syncInviteButtonLabel）。
+  // 那種裝置沒辦法把圖片直接塞進 LINE 對話，能做到的是：
+  // 把圖片複製到剪貼簿（順便存成檔案），再開啟 LINE 並帶入祝福文字，讓使用者自己貼上。
   if (inviteLine) {
     inviteLine.addEventListener("click", async () => {
-      // 電腦上如果系統分享面板吃得下檔案，就直接把 GIF 交給它：
-      // 在 Windows 的分享面板裡選 LINE，送出去就是一則「帶著動圖」的訊息，
-      // 不用剪貼簿、也不用使用者自己去附加圖片。
-      if (canSystemShareFiles()) {
-        let shareFile;
-        try {
-          shareFile = await ensureInviteFile();
-        } catch {
-          showToast("邀請卡製作失敗，請再試一次");
-          syncInviteButtonLabel();
-          return;
-        }
-        syncInviteButtonLabel();
-        SFX.click();
-        try {
-          await navigator.share({ files: [shareFile], title: "寒修行邀請函" });
-          return;
-        } catch (err) {
-          if (err && err.name === "AbortError") return; // 使用者自己關掉分享面板
-          // 其他錯誤（例如做圖做太久、瀏覽器判定已經不算「這次點擊」觸發的）
-          // 就讓它往下走，用原本那條「開 LINE ＋ 存檔」的路，不要讓使用者卡住
-        }
-      }
-
       // 緊跟著這次點擊同步呼叫，圖晚一點畫好沒關係（見 copyInviteImageToClipboard 的說明）
       const clipboardPromise = copyInviteImageToClipboard();
 
@@ -2065,11 +2088,7 @@ if (inviteBtn) {
         ? "（圖片已經複製到剪貼簿，在 LINE 對話框按 Ctrl/Cmd+V 貼上就好！）"
         : "（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
       window.open("https://line.me/R/msg/text/?" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
-      if (window.showSaveFilePicker) {
-        saveInviteAs(file);
-      } else {
-        omamoriFallbackDownload(file);
-      }
+      saveInviteFallback(file);
     });
   }
 }
@@ -2079,6 +2098,13 @@ if (inviteBtn) {
 window.addEventListener("resize", fitInviteCard);
 window.addEventListener("orientationchange", fitInviteCard);
 if (window.visualViewport) window.visualViewport.addEventListener("resize", fitInviteCard);
+
+// 分享不成（或這台裝置本來就不能分享）時的存檔出口：
+// Chrome／Edge 跳「另存新檔」讓使用者挑資料夾，其他瀏覽器就存到預設下載資料夾。
+function saveInviteFallback(file) {
+  if (window.showSaveFilePicker) saveInviteAs(file);
+  else omamoriFallbackDownload(file);
+}
 
 // 電腦版 Chrome／Edge：跳出「另存新檔」，使用者自己挑資料夾
 async function saveInviteAs(file) {

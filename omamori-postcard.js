@@ -86,7 +86,7 @@ function renderOmamoriPostcard(image, word, note, date, box) {
   ctx.font = `13px ${sans}`;
   ctx.fillText("2027寒修行", footerLeft, 538);
   ctx.font = `bold 17px ${sans}`;
-  ctx.fillText("真如世界大冒險·GO", footerLeft, footerTextY);
+  ctx.fillText("真如世界大冒險 Going", footerLeft, footerTextY);
   ctx.font = `16px ${sans}`;
   ctx.textAlign = "right";
   ctx.fillText(note, textRight, footerTextY);
