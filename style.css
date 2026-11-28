@@ -858,6 +858,7 @@ body {
 }
 .modal-temple[hidden] { display: none; }
 .modal-temple-photo {
+  position: relative; /* 國家洲別那行壓在照片右上角，定位基準就是這一塊 */
   aspect-ratio: 4 / 3;
   max-height: 34vh;
   margin: 0 auto;
@@ -876,13 +877,26 @@ body {
   transition: opacity 0.3s ease;
 }
 .modal-temple-photo img.loaded { opacity: 1; }
+/* 國家洲別：壓在照片右上角，不在照片下面另外佔一行。
+   照片上半部常常是天空（亮的），金色的字會看不見，所以墊一層半透明深色底。
+   照片那塊有 overflow:hidden 和圓角，所以貼齊邊角也不會超出圓角外面。 */
 .modal-temple-meta {
-  margin: 10px 0 0;
-  text-align: center;
-  font-size: clamp(14px, 3.6vw, 17px);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(38, 26, 14, 0.58);
+  color: #fff4df;
+  font-size: clamp(13px, 3.2vw, 16px);
   font-weight: 700;
   letter-spacing: 1px;
-  color: var(--gold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 /* 邀朋友：比「繼續前進」低調的次要按鈕，走到有地點的格子才會出現 */
@@ -923,14 +937,10 @@ body {
   max-height: 94vh;
   --pad-top: 18px;
 }
-.modal-card.temple-wide .modal-temple {
-  display: grid;
-  grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
-  gap: 18px;
-  align-items: center;
-}
+/* 矮又寬的螢幕原本是「照片左、國家洲別右」的兩欄排法，為的是省垂直空間。
+   現在那行字壓在照片上、完全不佔高度了，右欄會變成空的，所以兩欄排法拿掉，
+   改成照片置中、用 max-height 控制高度，一樣不會把卡片撐高。 */
 .modal-card.temple-wide .modal-temple-photo { max-height: 52vh; }
-.modal-card.temple-wide .modal-temple-meta { margin-top: 0; }
 .modal-card.temple-wide.has-temple .modal-place { margin-bottom: 8px; }
 .modal-card.temple-wide.has-temple .modal-plane,
 .modal-card.temple-wide.has-temple .modal-globe { width: 1.4em; }
@@ -1783,28 +1793,10 @@ body {
 .invite-actions > * {
   flex: 1 1 0;
   min-width: 0;
-  max-width: 230px;
+  max-width: 300px; /* 現在只剩一顆按鈕，放寬一點才不會細細一條縮在中間 */
   text-align: center;
   white-space: nowrap;
 }
-
-/* LINE 的品牌綠，純粹用來讓人一眼認出這是「傳去 LINE」的按鈕，不是官方標誌 */
-.invite-line {
-  padding: 11px 14px;
-  border: none;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #06c856, #00b140);
-  color: #fff;
-  font-family: inherit;
-  font-size: clamp(13px, 3.2vw, 15px);
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(0, 177, 64, 0.32);
-  transition: transform 0.18s ease;
-}
-.invite-line:hover { transform: translateY(-2px); }
-.invite-line[hidden] { display: none; }
 
 .invite-save {
   padding: 11px 14px;

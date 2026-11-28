@@ -327,7 +327,6 @@ const inviteName = document.getElementById("inviteName");
 const inviteRoute = document.getElementById("inviteRoute");
 const inviteStat = document.getElementById("inviteStat");
 const inviteSave = document.getElementById("inviteSave");
-const inviteLine = document.getElementById("inviteLine");
 const soundToggle = document.getElementById("soundToggle");
 const soundIcon = document.getElementById("soundIcon");
 const stageEl = document.querySelector(".stage");
@@ -1546,15 +1545,29 @@ async function openOmamori() {
   });
 }
 
-/* 按下「收下御守」：關掉視窗，並讓小飛機從按鈕那裡沿弧線飛向左下角的「寒修行原點」。
+/* 小飛機的起飛點：牌面中央面板的右下角，往內縮一點，
+   不然飛機會有一半掛在面板外面、看起來像從隔壁格子冒出來的。 */
+function omamoriFlightStart() {
+  const panel = document.getElementById("centerPanel") || document.getElementById("board");
+  if (!panel) return null;
+  const r = panel.getBoundingClientRect();
+  if (!r.width || !r.height) return null; // 版面還沒算好（或被藏起來）就讓呼叫端用備案
+  const inset = Math.min(40, r.width * 0.08, r.height * 0.08);
+  return { x: r.right - inset, y: r.bottom - inset };
+}
 
-   座標一定要在 closeOmamori() 之前量 —— 視窗一關，按鈕就不在畫面上了，
-   getBoundingClientRect() 會全部變成 0，飛機就會從左上角起飛。
+/* 按下「收下御守」：關掉視窗，並讓小飛機沿弧線飛向左下角的「寒修行原點」。
+
+   起飛點用中央面板的右下角，不是「收下御守」那顆按鈕 ——
+   按鈕在畫面正中央、位置又隨視窗大小跑，每次起飛的地方都不一樣；
+   固定從牌面右下角出發，弧線才會每次都一樣橫跨整個牌面。
+   面板量不到時（理論上不會）才退回按鈕，而按鈕的座標一定要在 closeOmamori() 之前量：
+   視窗一關按鈕就不在畫面上了，getBoundingClientRect() 會全部變成 0，飛機會從左上角起飛。
 
    只有這顆按鈕會放飛機：按右上角的 × 或點背景關掉是「跳過」，不給這個收尾。 */
 function takeOmamori() {
   const r = omamoriClose.getBoundingClientRect();
-  const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  const from = omamoriFlightStart() || { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   closeOmamori();
   const startTile = document.querySelector(".tile.type-start");
   if (startTile && typeof flyPlaneTo === "function") {
@@ -1843,11 +1856,7 @@ function useSystemShare() {
 }
 
 function syncInviteButtonLabel() {
-  const canShare = useSystemShare();
-  inviteSave.textContent = canShare ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
-  // 手機的分享選單裡就有 LINE，再放一顆「用 LINE 傳送」只是讓人多按一次；
-  // 電腦沒有這條捷徑，那顆按鈕要留著，不然就真的沒有辦法傳給 LINE 了。
-  if (inviteLine) inviteLine.hidden = canShare;
+  inviteSave.textContent = useSystemShare() ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
 }
 
 // 文字（或照片）換過了：現有的 GIF 作廢，正在做的那份就算做完也要丟掉。
@@ -1907,41 +1916,6 @@ function warmInviteFile() {
     if (!inviteOverlay.classList.contains("show")) return;
     ensureInviteFile({ silent: true }).catch(() => {}); // 先做失敗沒關係，按下去還會再做一次
   }, 700);
-}
-
-// 複製到剪貼簿用的靜態 PNG：剪貼簿圖片格式幾乎只認 image/png，GIF 不能用，
-// 所以另外畫一張不會動的版本（flap 固定 0），跟下載用的動態 GIF 是兩回事。
-async function buildInvitePngBlob() {
-  const assets = await getInviteAssets();
-  const personalNote = inviteNote.value.trim();
-  const personalName = inviteName.value.trim();
-  const opts = { ...assets, personalNote, personalName, pixelScale: 2 };
-  const canvas = invitePhotos
-    ? renderReturnFrame(opts, invitePhotos, 1) // 靜態圖一律用最後一幀：放大的親苑
-    : renderInviteCardDraft({ ...opts, placeImage: invitePlaceImage, flap: 0 });
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("PNG 轉檔失敗");
-  return blob;
-}
-
-// 電腦沒有手機的分享選單，但不少瀏覽器可以把圖片複製到剪貼簿，讓使用者直接在 LINE 裡貼上，
-// 不用自己去下載資料夾找檔案。clipboard.write() 這個呼叫本身要緊跟著使用者點擊、同步呼叫，
-// 不能先 await 別的事再呼叫，否則 Safari 這類瀏覽器會判定「不是使用者這次操作觸發的」而拒絕；
-// 圖真正畫好是晚一點的事，所以傳的是一個還沒 resolve 的 Promise，讓瀏覽器自己等。
-// 不支援、或寫入失敗就靜靜放棄，不影響原本「下載＋開 LINE」那條路。
-function copyInviteImageToClipboard() {
-  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-    return Promise.resolve(false);
-  }
-  try {
-    const item = new ClipboardItem({ "image/png": buildInvitePngBlob() });
-    return navigator.clipboard.write([item]).then(
-      () => true,
-      () => false
-    );
-  } catch {
-    return Promise.resolve(false);
-  }
 }
 
 function openInvite({ defaultNote = "", placeImg = null } = {}) {
@@ -2057,40 +2031,6 @@ if (inviteBtn) {
     }
     saveInviteFallback(file);
   });
-
-  // 這顆按鈕在電腦（以及叫不出系統分享面板的裝置）上出現（見 syncInviteButtonLabel）。
-  // 那種裝置沒辦法把圖片直接塞進 LINE 對話，能做到的是：
-  // 把圖片複製到剪貼簿（順便存成檔案），再開啟 LINE 並帶入祝福文字，讓使用者自己貼上。
-  if (inviteLine) {
-    inviteLine.addEventListener("click", async () => {
-      // 緊跟著這次點擊同步呼叫，圖晚一點畫好沒關係（見 copyInviteImageToClipboard 的說明）
-      const clipboardPromise = copyInviteImageToClipboard();
-
-      let file;
-      try {
-        file = await ensureInviteFile();
-      } catch {
-        showToast("邀請卡製作失敗，請再試一次");
-        syncInviteButtonLabel();
-        return;
-      }
-      // ensureInviteFile 會把「下載邀請卡」改成「製作動畫中…」，這條路以前忘了改回來，
-      // 按過一次「用 LINE 傳送」之後那顆按鈕就一直卡在「製作動畫中…」。
-      syncInviteButtonLabel();
-      SFX.click();
-      const copied = await clipboardPromise;
-      const note = inviteNote.value.trim();
-      const name = inviteName.value.trim();
-      const lines = [];
-      if (note) lines.push(`「${note}」`);
-      lines.push(name ? `—— ${name} 誠摯邀請你參加 2027寒修行` : "誠摯邀請你參加 2027寒修行");
-      lines.push(copied
-        ? "（圖片已經複製到剪貼簿，在 LINE 對話框按 Ctrl/Cmd+V 貼上就好！）"
-        : "（邀請卡圖片已經下載，記得在 LINE 裡把圖片也附加上去喔！）");
-      window.open("https://line.me/R/msg/text/?" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
-      saveInviteFallback(file);
-    });
-  }
 }
 
 // 畫面尺寸一變就重算邀請卡版面：轉向、視窗縮放，

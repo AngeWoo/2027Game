@@ -60,11 +60,18 @@ function centerOf(el) {
      onDone    結束後的 callback
    回傳一個可以提前中止的函式。 */
 function flyPlaneTo(from, to, opts = {}) {
+  /* 手機的牌面比電腦小很多，飛行距離短了一截，但飛機大小是固定的 px——
+     同樣縮 170→120，在電腦上飛得遠、看起來是「愈飛愈遠」，
+     在手機上整段路太短，就只像平移過去、沒有飛遠的感覺。
+     所以窄螢幕把終點再縮小一點，同樣的飛行時間內縮小速度就比較快。
+     起點維持 170 不動（那是刻意調大的機身），只動終點。 */
+  const narrowScreen = window.matchMedia("(max-width: 640px)").matches;
+
   const {
     arc = 0.32,
     duration = 5000,
     startSize = 170,
-    endSize = 120,
+    endSize = narrowScreen ? 100 : 120,
     fadeFrom = 0.72, // 飛到幾成之後開始淡出
     landRing = true,
     playSound = null,

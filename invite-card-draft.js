@@ -16,8 +16,8 @@ function loadInviteTitleImage(src = "invite-title-hanshugyo.png") {
   });
 }
 
-// ?v=2：2026-11-28 整張圖換過（容錯 L、29×29、含 2 格留白），不帶版本號會吃到舊的快取
-function loadInviteQrImage(src = "invite-qr.png?v=2") {
+// ?v=3：2026-11-28 整張圖換過（首頁網址、容錯 L、25×25、含 2 格留白），不帶版本號會吃到舊的快取
+function loadInviteQrImage(src = "invite-qr.png?v=3") {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
@@ -363,17 +363,31 @@ function renderInviteCardDraft(opts = {}) {
   // ---------- 底部資訊列 ----------
   const footerY = 558;
 
-  /* QR 從右下角那顆 58px，換成左下角 110px 的一塊。
+  /* QR 從右下角那顆 58px，換成左下角這一塊。
      原本那顆根本掃不出來：縮到 540 寬的 GIF 之後只剩 0.85 像素／模組——
      模組比一個像素還小，重新取樣時直接被抹平，等於畫了一個長得像 QR 的裝飾。
      搬到左下角是因為右下角被「敬邀」印章佔住（圓心 812、半徑 58），放不下。
-     invite-qr.png 也一起重做了：同一個網址，容錯等級從 H 降到 L，
-     格數 41×41 → 29×29，左右各 2 格留白已經畫進圖裡，所以整張圖是 33 格寬。 */
-  const QR_CELLS = 33; // invite-qr.png 的總格數（29 格資料 + 左右各 2 格留白）
-  const qrBox = 110;   // 左下角塞得下的最大尺寸：上面讓開時間表，下面壓到海浪紋上緣
+
+     invite-qr.png 指向真如苑首頁，不是某一年的活動頁：
+     寒修行每年換網址（2026 是 at2026/index2026.html），但邀請卡是寄給別人的，
+     寄出去就改不掉了。指到首頁就不會有哪一年的頁面下架之後收卡的人掃到 404 的問題。
+     首頁網址短，格數也只要 25×25（容錯 L），左右各 2 格留白畫進圖裡，所以整張圖 29 格寬。 */
+  const QR_CELLS = 29; // invite-qr.png 的總格數（25 格資料 + 左右各 2 格留白）
+  const qrBox = 110;   // 左下角塞得下的上限：上面讓開時間表，下面壓到海浪紋上緣
   const qrX = textX;
   const qrY = footerY - 92;
-  const infoX = qrX + qrBox + 26; // 年份和遊戲名讓到 QR 右邊
+
+  /* 每個模組在輸出解析度上至少要有 2 個像素，不然重新取樣會把模組吃掉。
+     目前三種 pixelScale 都過得了這條線（GIF 的 0.6 是 2.28、預覽的 1 和 2 更寬鬆），
+     所以一律照 qrBox 畫滿，預覽和 GIF 的構圖也就一模一樣。
+     真的低於 2 的話（例如之後又把 GIF 調更小）才退而求其次：
+     吸附成整數的每模組像素。imageSmoothingEnabled=false 是最近鄰取樣，
+     模組寬度除不盡時會變成有的 2px、有的 1px，那種寬窄不一在像素很少時才會出問題。
+     （2.28 這個值是實測過的：從產出的 GIF 裡把 QR 裁下來，網址完整解得回來。） */
+  const rawPerModule = (qrBox * pixelScale) / QR_CELLS;
+  const qrPerModule = rawPerModule >= 2 ? rawPerModule : Math.max(1, Math.round(rawPerModule));
+  const qrSize = (qrPerModule * QR_CELLS) / pixelScale;
+  const infoX = qrX + qrSize + 26; // 年份和遊戲名讓到 QR 右邊
 
   ctx.strokeStyle = "rgba(243, 199, 107, 0.4)";
   ctx.lineWidth = 1;
@@ -397,39 +411,28 @@ function renderInviteCardDraft(opts = {}) {
 
   // QR code
   if (qrImage && qrImage.naturalWidth) {
-    /* 重點是「一個模組要剛好佔整數個輸出像素」。
-       GIF 走 pixelScale=0.6（540 寬），110×0.6 = 66 = 33 格 × 2 像素，剛好整除；
-       但只要尺寸被改過就可能變成 1.9 像素／模組，而 imageSmoothingEnabled=false
-       是最近鄰取樣，會把模組畫成有的 2px、有的 1px——寬窄不一的模組比單純模糊更難掃。
-       所以先取整數的每模組像素，再回推實際要畫多大；位置也對齊到輸出像素格，
-       不然整張圖落在半個像素上，一樣會被重新取樣糊掉。 */
-    const rawPerModule = (qrBox * pixelScale) / QR_CELLS;
-    // 每模組有 3 個像素以上時，差個半像素不影響辨識，就照原尺寸畫，
-    // 預覽（pixelScale 1／2）和 GIF（0.6）的構圖才會一模一樣；
-    // 只有在像素真的吃緊時（GIF 剛好是 2 像素／模組）才去遷就整數。
-    const perModule = rawPerModule >= 3 ? rawPerModule : Math.max(1, Math.round(rawPerModule));
-    const drawSize = (perModule * QR_CELLS) / pixelScale;
+    // 位置也對齊到輸出的像素格，不然整張圖落在半個像素上，一樣會被重新取樣糊掉
     const dx = Math.round(qrX * pixelScale) / pixelScale;
     const dy = Math.round(qrY * pixelScale) / pixelScale;
     const pad = 7;
     ctx.fillStyle = "#fdf8ee";
-    ctx.fillRect(dx - pad, dy - pad, drawSize + pad * 2, drawSize + pad * 2);
+    ctx.fillRect(dx - pad, dy - pad, qrSize + pad * 2, qrSize + pad * 2);
     ctx.save();
     ctx.imageSmoothingEnabled = false; // 模組邊緣要銳利，不能讓瀏覽器做平滑內插
-    ctx.drawImage(qrImage, dx, dy, drawSize, drawSize);
+    ctx.drawImage(qrImage, dx, dy, qrSize, qrSize);
     ctx.restore();
     ctx.strokeStyle = "rgba(253, 248, 238, 0.9)";
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(dx - pad, dy - pad, drawSize + pad * 2, drawSize + pad * 2);
+    ctx.strokeRect(dx - pad, dy - pad, qrSize + pad * 2, qrSize + pad * 2);
   } else {
     ctx.strokeStyle = "rgba(253, 248, 238, 0.75)";
     ctx.lineWidth = 2;
     const corner = 16;
     for (const [cx, cy, dx, dy] of [
       [qrX, qrY, 1, 1],
-      [qrX + qrBox, qrY, -1, 1],
-      [qrX, qrY + qrBox, 1, -1],
-      [qrX + qrBox, qrY + qrBox, -1, -1],
+      [qrX + qrSize, qrY, -1, 1],
+      [qrX, qrY + qrSize, 1, -1],
+      [qrX + qrSize, qrY + qrSize, -1, -1],
     ]) {
       ctx.beginPath();
       ctx.moveTo(cx, cy + corner * dy);
@@ -440,7 +443,7 @@ function renderInviteCardDraft(opts = {}) {
     ctx.fillStyle = "rgba(253, 248, 238, 0.6)";
     ctx.font = `13px ${sans}`;
     ctx.textAlign = "center";
-    ctx.fillText("QR", qrX + qrBox / 2, qrY + qrBox / 2 + 5);
+    ctx.fillText("QR", qrX + qrSize / 2, qrY + qrSize / 2 + 5);
     ctx.textAlign = "left";
   }
 

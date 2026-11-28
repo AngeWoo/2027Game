@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=99">
+<link rel="stylesheet" href="style.css?v=101">
 </head>
 <body>
 
@@ -121,10 +121,9 @@
     <figure class="modal-temple" id="modalTemple" hidden>
       <div class="modal-temple-photo">
         <img id="modalTempleImg" alt="" decoding="async">
-      </div>
-      <figcaption>
+        <!-- 國家洲別壓在照片右上角，不另外佔一行（排版見 style.css .modal-temple-meta） -->
         <p class="modal-temple-meta" id="modalTempleMeta"></p>
-      </figcaption>
+      </div>
     </figure>
     <!-- 邀朋友：走到有地點的格子時，順勢邀人一起參加寒修行 -->
     <button class="modal-invite-cta" id="modalInviteCta" type="button" hidden>💌 邀朋友一起出發</button>
@@ -196,9 +195,11 @@
         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" enterkeyhint="done">
     </label>
 
+    <!-- 只有一顆按鈕：手機／平板叫系統分享選單（選單裡就有 LINE，圖片會直接進對話），
+         電腦就是存檔。以前還有一顆「用 LINE 傳送」，但它只能把圖複製到剪貼簿再開啟 LINE，
+         要使用者自己貼上——做不到「把圖直接放進對話」，留著只會讓人以為按了就送出去了。 -->
     <div class="invite-actions">
       <a class="invite-save" id="inviteSave" download aria-live="polite">⤓ 下載邀請卡</a>
-      <button class="invite-line" id="inviteLine" type="button" hidden>📨 用 LINE 傳送</button>
     </div>
   </div>
 </div>
@@ -221,10 +222,10 @@
 
 <script src="omamori-postcard.js?v=7"></script>
 <script src="gif.js?v=1"></script>
-<script src="invite-card-draft.js?v=22"></script>
+<script src="invite-card-draft.js?v=23"></script>
 <script src="temples.js?v=2"></script>
 <script src="invite-return-anim.js?v=8"></script>
-<script src="plane-flight.js?v=8"></script>
-<script src="script.js?v=105"></script>
+<script src="plane-flight.js?v=9"></script>
+<script src="script.js?v=107"></script>
 </body>
 </html>
