@@ -407,6 +407,12 @@ const omamoriSave = document.getElementById("omamoriSave");
 const pressSaveOverlay = document.getElementById("pressSaveOverlay");
 const pressSaveImg = document.getElementById("pressSaveImg");
 const pressSaveX = document.getElementById("pressSaveX");
+const pressSaveCopy = document.getElementById("pressSaveCopy");
+const pressSaveUrl = document.getElementById("pressSaveUrl");
+const pressSaveDownload = document.getElementById("pressSaveDownload");
+const pressSaveShare = document.getElementById("pressSaveShare");
+const pressSaveInfo = document.getElementById("pressSaveInfo");
+const pressSaveStatus = document.getElementById("pressSaveStatus");
 const omamoriX = document.getElementById("omamoriX");
 const omamoriCountEl = document.getElementById("omamoriCount");
 const omamoriWordText = document.getElementById("omamoriWordText");
@@ -1476,19 +1482,17 @@ function isHandheld() {
   return window.matchMedia("(pointer: coarse)").matches;
 }
 
-// 網頁不能自己寫進相簿，但手機的分享選單裡就有「儲存影像」，按下去就是存進相簿
-function canShareToAlbum(file) {
-  return !!file && isHandheld() && !!navigator.canShare && navigator.canShare({ files: [file] });
+// 分享支援只代表能交給系統，不代表 Android 提供「存到相簿」。
+function canShareImageFile(file) {
+  try {
+    return !!file && window.isSecureContext && typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
 }
 
-/* 長按存圖：給「叫不出系統分享選單」的手機用，主要是 App 內建瀏覽器
-   （LINE、Facebook、IG 點網址開出來的 WebView）。那種環境有兩個坑疊在一起：
-     1. 沒有 navigator.share，所以走不到分享選單那條路；
-     2. <a download> 配 blob: 在 WebView 裡不會觸發下載，按下去「完全沒有反應」，
-        使用者回報的「出現下載但無法下載、相簿裡也沒看到」就是這個。
-   那裡唯一還能把圖存進相簿的方式，是讓使用者長按圖片、用系統自己的選單存，
-   所以把圖攤開成一張夠大的 <img> 並寫清楚怎麼做。
-   圖片用 data: URL 而不是 blob:——WebView 的「儲存圖片」對 blob: 一樣常常失敗。 */
+// 預覽保留原始 PNG／GIF 位元組，不把 GIF 經 canvas 轉成靜態圖片。
 function fileToDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1498,10 +1502,29 @@ function fileToDataURL(file) {
   });
 }
 
+let pressSaveFile = null;
+let pressSaveObjectUrl = null;
+let pressSaveReturnFocus = null;
+const androidDownloadHint = "Android：下載後到「檔案 → 下載（Download）」查看。相簿未顯示時，可用檔案 App 將圖片複製到「Pictures」資料夾。";
+
+function releasePressSaveUrl() {
+  const url = pressSaveObjectUrl;
+  pressSaveObjectUrl = null;
+  // 使用者可能按下載後立刻關視窗，讓瀏覽器有時間接手檔案。
+  if (url) setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function closePressToSave() {
   if (!pressSaveOverlay) return;
   pressSaveOverlay.classList.remove("show");
-  pressSaveImg.removeAttribute("src"); // data: URL 很大，關掉就放掉
+  pressSaveImg.removeAttribute("src");
+  pressSaveDownload.removeAttribute("href");
+  pressSaveFile = null;
+  releasePressSaveUrl();
+  if (pressSaveReturnFocus && pressSaveReturnFocus.isConnected) {
+    pressSaveReturnFocus.focus({ preventScroll: true });
+  }
+  pressSaveReturnFocus = null;
 }
 
 async function showPressToSave(file) {
@@ -1509,33 +1532,99 @@ async function showPressToSave(file) {
     omamoriFallbackDownload(file); // 沒有這個視窗就退回原本的做法
     return;
   }
-  try {
-    pressSaveImg.src = await fileToDataURL(file);
-  } catch {
-    showToast("圖片準備失敗，請再試一次");
-    return;
-  }
+  releasePressSaveUrl();
+  pressSaveFile = file;
+  pressSaveReturnFocus = document.activeElement;
+  pressSaveObjectUrl = URL.createObjectURL(file);
+  pressSaveDownload.href = pressSaveObjectUrl;
+  pressSaveDownload.download = file.name;
+  const isGif = file.type === "image/gif";
+  pressSaveDownload.textContent = isGif ? "⤓ 下載 GIF 邀請函" : "⤓ 下載 PNG 明信片";
+  pressSaveInfo.textContent = `${file.name}（${(file.size / 1024 / 1024).toFixed(2)} MB）${isGif ? "・保留完整動畫" : ""}`;
+  pressSaveStatus.textContent = androidDownloadHint;
+  pressSaveShare.hidden = !canShareImageFile(file);
+  pressSaveShare.disabled = false;
+  pressSaveImg.removeAttribute("src");
+  if (pressSaveUrl) pressSaveUrl.textContent = location.href;
   pressSaveOverlay.classList.add("show");
+  pressSaveOverlay.querySelector(".press-save-card").scrollTop = 0;
+  pressSaveDownload.focus({ preventScroll: true });
+  try {
+    const dataUrl = await fileToDataURL(file);
+    if (pressSaveFile === file) pressSaveImg.src = dataUrl;
+  } catch {
+    if (pressSaveFile === file) pressSaveStatus.textContent = "預覽載入失敗，仍可點下載取得原始檔案。";
+  }
+}
+
+/* 複製網址：WebView 裡最可靠的出口就是「換一個瀏覽器開」。
+   clipboard API 在部分 WebView 會被擋，所以留一條老派的 execCommand 備案。 */
+async function copyPageLink() {
+  const url = location.href;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(url);
+      return true;
+    }
+  } catch {
+    /* 掉到下面那條 */
+  }
+  try {
+    const box = document.createElement("textarea");
+    box.value = url;
+    box.setAttribute("readonly", "");
+    box.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+    document.body.appendChild(box);
+    box.select();
+    box.setSelectionRange(0, url.length);
+    const ok = document.execCommand("copy");
+    box.remove();
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 if (pressSaveOverlay) {
+  pressSaveDownload.addEventListener("click", () => {
+    // 讓原生 <a download> 在這次手勢直接下載，不等待轉檔或呼叫分享。
+    pressSaveStatus.textContent = "已交給瀏覽器處理下載；請查看下載通知或「檔案 → 下載」。若沒有檔案，請改用 Chrome 重新下載。";
+  });
+  pressSaveShare.addEventListener("click", async () => {
+    const file = pressSaveFile;
+    if (!canShareImageFile(file)) {
+      pressSaveStatus.textContent = "此瀏覽器無法分享此檔案，請點下載。";
+      return;
+    }
+    pressSaveShare.disabled = true;
+    try {
+      // 檔案已備妥，直接在點擊當下呼叫，避免 GIF 轉檔耗盡使用者啟用期限。
+      await navigator.share({ files: [file], title: file.type === "image/gif" ? "寒修行邀請函" : "今日御守明信片" });
+      if (pressSaveFile === file) pressSaveStatus.textContent = "檔案已交給分享選單；要保留在手機，請點下載或使用接收 App 的儲存功能。";
+    } catch (err) {
+      if (pressSaveFile === file) pressSaveStatus.textContent = err && err.name === "AbortError"
+        ? "已取消分享；仍可點下載保留檔案。"
+        : "分享未完成，請點下載；若在 App 內開啟，請改用 Chrome。";
+    } finally {
+      if (pressSaveFile === file) pressSaveShare.disabled = false;
+    }
+  });
   pressSaveX.addEventListener("click", closePressToSave);
   pressSaveOverlay.addEventListener("click", (e) => {
     // 只有點到背景才關；點在圖片上要留給「長按」，不能被關掉
     if (e.target === pressSaveOverlay) closePressToSave();
   });
+  if (pressSaveCopy) {
+    pressSaveCopy.addEventListener("click", async () => {
+      const ok = await copyPageLink();
+      pressSaveCopy.textContent = ok ? "✓ 已複製，貼到瀏覽器開啟" : "複製失敗，請手動複製網址";
+      setTimeout(() => { pressSaveCopy.textContent = "⧉ 複製網址"; }, 2600);
+    });
+  }
 }
 
-/* 手機上存檔的統一出口：有分享選單就用分享選單，沒有就走長按存圖。
-   電腦不走這裡（電腦的 <a download> 是正常的）。 */
-function saveImageOnHandheld(file, shareTitle) {
-  if (canShareToAlbum(file)) {
-    navigator.share({ files: [file], title: shareTitle }).catch((err) => {
-      if (err && err.name === "AbortError") return; // 使用者自己關掉選單
-      showPressToSave(file); // 分享被拒就改走長按，不要退回那條在 WebView 行不通的下載
-    });
-    return;
-  }
+// 手機一定提供獨立下載入口；分享與長按只作為額外選項。
+function saveImageOnHandheld(file) {
   showPressToSave(file);
 }
 
@@ -1552,9 +1641,7 @@ function setOmamoriDownload(file, date, render) {
   clearOmamoriDownload();
   omamoriSave.href = URL.createObjectURL(file);
   omamoriSave.download = file.name;
-  // 手機上兩條路（分享選單／長按存圖）最後都是存進相簿，所以標籤一致；
-  // 以前這裡寫「下載明信片」，但在 WebView 裡按了根本下載不了，標籤本身就是誤導。
-  omamoriSave.textContent = isHandheld() ? "⤓ 存到相簿" : "⤓ 下載明信片";
+  omamoriSave.textContent = isHandheld() ? "⤓ 儲存明信片 PNG" : "⤓ 下載明信片";
   omamoriDownload = { file, date, render };
 }
 
@@ -1640,10 +1727,10 @@ if (omamoriSave) {
       e.preventDefault();
       return;
     }
-    // 手機：分享選單按「儲存影像」就進相簿；叫不出選單（App 內建瀏覽器）就走長按存圖
+    // 手機先顯示已備妥的檔案，下一次點下載／分享時有全新的使用者啟用。
     if (isHandheld()) {
       e.preventDefault();
-      saveImageOnHandheld(file, "今日御守明信片");
+      saveImageOnHandheld(file);
       return;
     }
     // 電腦（Chrome／Edge）：自己挑存放目錄
@@ -1981,34 +2068,8 @@ function queueInvitePreview() {
   }, 250);
 }
 
-// 系統的分享面板吃不吃得下檔案 —— 不限手機。
-// Windows 上 Chrome 的 navigator.share() 會叫出系統分享面板，而 Microsoft Store 版的 LINE
-// 在 manifest 裡宣告了 windows.shareTarget（支援 StorageItems，也就是檔案），
-// 所以電腦上也能把 GIF 直接交給 LINE，不必經過剪貼簿、也不用使用者自己附加圖片。
-// 跟實際檔案內容無關，用一個假檔案探一次就好。
-function canSystemShareFiles() {
-  try {
-    const probe = new File([new Uint8Array([0])], "p.gif", { type: "image/gif" });
-    return !!navigator.canShare && navigator.canShare({ files: [probe] });
-  } catch {
-    return false;
-  }
-}
-
-// 要不要把事情交給系統分享面板。
-//
-// 2026-11-28 改回只在手機／平板走分享：Windows 的分享面板「列得出」LINE
-// （Store 版 LINE 的 manifest 確實宣告了 windows.shareTarget），canShare() 也回 true，
-// 但實測點下去檔案並沒有真的進到 LINE 對話，等於按了沒反應；
-// 而且那時電腦上只剩這一條路——存檔和「用 LINE 傳送」兩顆按鈕都被藏起來了，
-// 使用者變成既存不了圖也傳不出去。所以電腦一律走「下載 ＋ 剪貼簿開 LINE」這條確定可行的路。
-// canSystemShareFiles() 本身留著，是因為手機上還是要先確認面板吃得下檔案。
-function useSystemShare() {
-  return isHandheld() && canSystemShareFiles();
-}
-
 function syncInviteButtonLabel() {
-  inviteSave.textContent = useSystemShare() ? "⤓ 分享 / 存到相簿" : "⤓ 下載邀請卡";
+  inviteSave.textContent = isHandheld() ? "⤓ 儲存邀請函 GIF" : "⤓ 下載邀請卡";
 }
 
 // 文字（或照片）換過了：現有的 GIF 作廢，正在做的那份就算做完也要丟掉。
@@ -2172,15 +2233,6 @@ if (inviteBtn) {
       showToast("邀請卡製作失敗，請再試一次");
       return;
     }
-    // 手機／平板交給系統分享選單（裡面就有 LINE）；電腦走下面的存檔那條。
-    if (useSystemShare()) {
-      SFX.click();
-      navigator.share({ files: [file], title: "寒修行邀請函" }).catch((err) => {
-        if (err && err.name === "AbortError") return; // 使用者自己關掉選單
-        saveInviteFallback(file); // 分享被拒（例如授權過期）就至少把檔案存下來
-      });
-      return;
-    }
     saveInviteFallback(file);
   });
 }
@@ -2194,10 +2246,9 @@ if (window.visualViewport) window.visualViewport.addEventListener("resize", fitI
 // 分享不成（或這台裝置本來就不能分享）時的存檔出口：
 // Chrome／Edge 跳「另存新檔」讓使用者挑資料夾，其他瀏覽器就存到預設下載資料夾。
 function saveInviteFallback(file) {
-  // 手機沒走到系統分享（例如 App 內建瀏覽器）時，<a download> 一樣是無效的，
-  // 要走長按存圖，不然就會變成「按了沒反應、相簿裡也找不到」。
+  // 手機即使沒有分享 API，也提供明確的下載按鈕與下載位置說明。
   if (isHandheld()) {
-    saveImageOnHandheld(file, "寒修行邀請函");
+    saveImageOnHandheld(file);
     return;
   }
   if (window.showSaveFilePicker) saveInviteAs(file);
@@ -2222,6 +2273,11 @@ async function saveInviteAs(file) {
 }
 
 document.addEventListener("keydown", (e) => {
+  if (pressSaveOverlay && pressSaveOverlay.classList.contains("show")) {
+    if (e.key === "Escape") closePressToSave();
+    else trapTab(e, pressSaveOverlay.querySelector(".press-save-card"));
+    return;
+  }
   const inviteOpen = !!inviteOverlay && inviteOverlay.classList.contains("show");
   const omamoriOpen = !!omamoriOverlay && omamoriOverlay.classList.contains("show");
   const quizOpen = !!quizOverlay && quizOverlay.classList.contains("show");

@@ -11,7 +11,7 @@
 <meta name="description" content="&#8203;">
 <meta name="theme-color" content="#fff3e4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23e2791f'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23fff3e4'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23d1544a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=103">
+<link rel="stylesheet" href="style.css?v=105">
 </head>
 <body>
 
@@ -165,15 +165,23 @@
   </div>
 </div>
 
-<!-- 長按存圖：給「叫不出系統分享選單」的 App 內建瀏覽器（LINE、FB、IG 開出來的 WebView）用。
-     那種環境 <a download> 按了不會有任何反應，長按圖片用系統選單存才是唯一能進相簿的路。 -->
+<!-- 手機檔案儲存：下載與分享分開，避免把叫出分享或顯示圖片當成已存入相簿。 -->
 <div class="press-save-overlay" id="pressSaveOverlay">
   <div class="press-save-card" role="dialog" aria-modal="true" aria-labelledby="pressSaveTitle" tabindex="-1">
     <button class="press-save-x" id="pressSaveX" aria-label="關閉">×</button>
-    <h2 class="press-save-title" id="pressSaveTitle">長按圖片存進相簿</h2>
-    <p class="press-save-hint">在下面的圖片上<b>長按</b>，選「下載圖片」或「儲存圖片」。</p>
-    <img class="press-save-img" id="pressSaveImg" alt="長按這張圖片即可儲存">
-    <p class="press-save-foot">長按沒反應的話，用右上角選單的「以其他瀏覽器開啟」再存一次。</p>
+    <h2 class="press-save-title" id="pressSaveTitle">儲存圖片檔案</h2>
+    <p class="press-save-hint" id="pressSaveInfo"></p>
+    <a class="press-save-download" id="pressSaveDownload" download>⤓ 下載檔案</a>
+    <button class="press-save-share" id="pressSaveShare" type="button" hidden>分享檔案</button>
+    <p class="press-save-hint" id="pressSaveStatus" role="status">
+      Android：下載後到「檔案 → 下載（Download）」查看。相簿未顯示時，可用檔案 App 將圖片複製到「Pictures」資料夾。
+    </p>
+    <p class="press-save-or">若從 LINE、Facebook 等 App 開啟，下載沒有反應，請用選單「以其他瀏覽器開啟」改用 Chrome，再重新製作並下載。</p>
+    <button class="press-save-copy" id="pressSaveCopy" type="button">⧉ 複製網址</button>
+    <!-- 剪貼簿 API 在 WebView 裡常常被擋，所以網址也直接攤出來讓使用者自己選取 -->
+    <p class="press-save-url" id="pressSaveUrl"></p>
+    <img class="press-save-img" id="pressSaveImg" alt="待儲存的圖片預覽">
+    <p class="press-save-foot">iPhone／iPad 可點「分享檔案」，再選系統提供的儲存選項。長按預覽圖片僅為備用方式；網頁無法確認是否已存入相簿。</p>
   </div>
 </div>
 
@@ -207,9 +215,7 @@
         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" enterkeyhint="done">
     </label>
 
-    <!-- 只有一顆按鈕：手機／平板叫系統分享選單（選單裡就有 LINE，圖片會直接進對話），
-         電腦就是存檔。以前還有一顆「用 LINE 傳送」，但它只能把圖複製到剪貼簿再開啟 LINE，
-         要使用者自己貼上——做不到「把圖直接放進對話」，留著只會讓人以為按了就送出去了。 -->
+    <!-- 手機開啟檔案儲存視窗，電腦直接存檔。 -->
     <div class="invite-actions">
       <a class="invite-save" id="inviteSave" download aria-live="polite">⤓ 下載邀請卡</a>
     </div>
@@ -238,6 +244,6 @@
 <script src="temples.js?v=2"></script>
 <script src="invite-return-anim.js?v=8"></script>
 <script src="plane-flight.js?v=9"></script>
-<script src="script.js?v=109"></script>
+<script src="script.js?v=111"></script>
 </body>
 </html>

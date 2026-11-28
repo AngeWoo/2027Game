@@ -2029,11 +2029,7 @@ body {
   .plane-land-ring { display: none; }
 }
 
-/* ---------- 長按存圖（App 內建瀏覽器專用） ----------
-   LINE／FB／IG 開出來的 WebView 沒有 navigator.share，<a download> 配 blob: 又完全無效，
-   按下去不會有任何反應。那裡唯一還能把圖存進相簿的方式，就是讓使用者長按圖片，
-   用系統自己的「下載圖片」選單存。這個視窗就是把那張圖好好地攤開給他長按。
-   疊在御守視窗（z-index 55）上面，所以要更高。 */
+/* ---------- 手機檔案下載與分享，疊在原有卡片視窗上 ---------- */
 .press-save-overlay {
   position: fixed;
   inset: 0;
@@ -2085,6 +2081,65 @@ body {
   color: var(--warm-ink);
 }
 .press-save-hint b { color: var(--gold); }
+.press-save-download,
+.press-save-share {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--accent-1);
+  border-radius: 999px;
+  color: var(--warm-ink);
+  background: #fffaf2;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+.press-save-download {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #fff;
+}
+.press-save-share[hidden] { display: none; }
+.press-save-share:disabled { opacity: 0.6; cursor: wait; }
+.press-save-download:focus-visible,
+.press-save-share:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.press-save-hint { line-height: 1.6; overflow-wrap: anywhere; }
+/* 複製網址：WebView 裡最可靠的出口是「換一個瀏覽器開」，所以這顆要顯眼 */
+.press-save-copy {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #fff;
+  font-family: inherit;
+  font-size: clamp(14px, 3.6vw, 16px);
+  font-weight: 800;
+  cursor: pointer;
+}
+/* 網址明文：複製鈕失效時的保險，可以長按選取，或直接看著打 */
+.press-save-url {
+  margin: -6px 0 14px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(var(--warm-ink-rgb), 0.06);
+  font-size: clamp(11px, 2.9vw, 13px);
+  line-height: 1.45;
+  color: rgba(var(--warm-ink-rgb), 0.85);
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.press-save-or {
+  margin: 0 0 10px;
+  font-size: clamp(12px, 3.1vw, 14px);
+  color: rgba(var(--warm-ink-rgb), 0.75);
+}
+.press-save-or b { color: var(--gold); }
 /* 長按要叫得出系統選單，圖片就不能被這些屬性擋住 */
 .press-save-img {
   display: block;
