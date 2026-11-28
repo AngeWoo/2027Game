@@ -200,13 +200,28 @@ body {
   line-height: 1.12;
 }
 
+/* 七彩跑馬燈標題。
+   漸層裡放「兩輪」完整彩虹、背景寬度設 200%，所以畫面上隨時看到的是剛好一輪；
+   動畫把背景推移兩輪的距離，頭尾顏色對得起來，循環時不會有接縫跳色。
+   （只放一輪的話推到底會從紫直接跳回紅，看得出來一頓。）
+   紅橙黃綠青藍紫各自壓暗一點，才不會在米色紙底上刺眼。 */
 .grad-text {
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-3), var(--accent-2));
+  background: linear-gradient(
+    90deg,
+    #e8503a, #f0892f, #f2c231, #5bb563, #37a6c4, #4a63d0, #9a5bc4,
+    #e8503a, #f0892f, #f2c231, #5bb563, #37a6c4, #4a63d0, #9a5bc4,
+    #e8503a
+  );
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: shine 6s linear infinite;
+}
+
+/* 會動的彩色字對部分使用者是負擔，關掉動畫後停在彩虹中段，字一樣看得清楚 */
+@media (prefers-reduced-motion: reduce) {
+  .grad-text { animation: none; background-position: 50% center; }
 }
 @keyframes shine {
   to { background-position: 200% center; }

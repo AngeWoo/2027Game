@@ -56,20 +56,56 @@ const SFX = (() => {
     }
   }
 
+  function isRunning() {
+    return !!ctx && ctx.state === "running";
+  }
+
+  /* 把 AudioContext 叫醒。
+     非 running 的狀態有三種，以前只處理了第一種：
+       suspended   － 自動播放政策擋住，或閒置太久被瀏覽器停掉
+       interrupted － iOS 專有：來電、鬧鐘、Siri、別的 App 搶走音訊就會變這個狀態。
+                     舊版只檢查 suspended，所以 iPhone 被打斷過一次之後就再也醒不過來，
+                     這就是「有時會忽然沒有音效」最主要的原因。
+       closed      － 救不回來了，只能整個重建（見 getCtx）
+     另外 resume() 是非同步的，而且「不在使用者手勢裡」呼叫會被拒絕。
+     以前沒接 rejection 也沒重試，叫不醒就永遠醒不來了；
+     現在失敗就把「下次碰到畫面再試一次」的監聽掛回去。 */
+  function wakeCtx() {
+    if (!ctx || ctx.state === "closed" || ctx.state === "running") return;
+    armUnlock(); // 先上保險；真的叫醒了會自己拆掉
+    let p;
+    try {
+      p = ctx.resume();
+    } catch (e) {
+      return;
+    }
+    if (p && p.then) {
+      p.then(
+        () => { if (isRunning()) disarmUnlock(); },
+        () => {} // 被拒絕很正常（不在手勢裡），交給上面掛好的監聽重試
+      );
+    }
+  }
+
   function getCtx() {
+    if (ctx && ctx.state === "closed") ctx = null; // 關掉的救不回來，重建一個
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       claimAudioSession();
       ctx = new AC();
+      // 只要掉出 running（被打斷、被停掉），就重新掛上「下次碰畫面叫醒」的監聽。
+      // 沒有這個的話，中途斷掉就只能靠使用者重新整理頁面。
+      ctx.addEventListener("statechange", () => {
+        if (!isRunning()) armUnlock();
+      });
     }
-    if (ctx.state === "suspended") ctx.resume();
+    wakeCtx();
     return ctx;
   }
 
   // iOS 規定要在使用者手勢裡「真的播出」一次聲音，之後排的聲音才放得出來。
   // 這裡送一個 1 格的無聲 buffer，使用者聽不到，但足以解鎖。
-  let unlocked = false;
   function unlockNow() {
     if (!enabled) return; // 使用者自己關掉音效時，不要去搶走他正在聽的音樂
     claimAudioSession();
@@ -83,23 +119,72 @@ const SFX = (() => {
     } catch (e) {
       /* ignore */
     }
-    if (c.state === "running") unlocked = true;
   }
 
-  // 不用等到按擲骰：第一次碰到畫面的任何地方就先解鎖
-  function firstTouch() {
+  /* 「下次碰到畫面就把音訊叫醒」的監聽。
+     以前解鎖成功就把監聽永久移除，所以後來被打斷時沒有任何東西會把它救回來。
+     現在改成可以重複掛上、醒了就拆掉，被打斷幾次都能自己恢復。 */
+  let unlockArmed = false;
+  function onUserGesture() {
     unlockNow();
-    if (!unlocked) return;
-    document.removeEventListener("pointerdown", firstTouch);
-    document.removeEventListener("touchend", firstTouch);
+    if (isRunning()) disarmUnlock();
   }
-  document.addEventListener("pointerdown", firstTouch, { passive: true });
-  document.addEventListener("touchend", firstTouch, { passive: true });
+  function armUnlock() {
+    if (unlockArmed) return;
+    unlockArmed = true;
+    document.addEventListener("pointerdown", onUserGesture, { passive: true });
+    document.addEventListener("touchend", onUserGesture, { passive: true });
+    document.addEventListener("keydown", onUserGesture);
+  }
+  function disarmUnlock() {
+    if (!unlockArmed) return;
+    unlockArmed = false;
+    document.removeEventListener("pointerdown", onUserGesture);
+    document.removeEventListener("touchend", onUserGesture);
+    document.removeEventListener("keydown", onUserGesture);
+  }
+  armUnlock(); // 不用等到按擲骰：第一次碰到畫面的任何地方就先解鎖
 
-  // 切去別的 App 再切回來，手機會把音訊停掉，回來要重新叫醒
+  /* 在使用者手勢裡，把音訊弄回「真的出得了聲」的狀態。
+     resume() 叫不醒就整個重建一個 —— 這是最後的保險。
+     沒有它的話，使用者按喇叭只會看到圖示變了卻一點聲音都沒有，以為是按鈕壞掉。 */
+  function revive() {
+    const c = getCtx();
+    if (!c) return Promise.resolve(false);
+    if (c.state === "running") return Promise.resolve(true);
+    let p;
+    try {
+      p = c.resume();
+    } catch (e) {
+      p = null;
+    }
+    const settled = p && p.then
+      ? p.then(() => isRunning(), () => false)
+      : Promise.resolve(isRunning());
+    return settled.then((ok) => {
+      if (ok) return true;
+      try {
+        c.close();
+      } catch (e) {
+        /* ignore */
+      }
+      ctx = null;
+      const fresh = getCtx(); // 手勢裡新建的 context 多半直接就是 running
+      return !!fresh && fresh.state === "running";
+    });
+  }
+
+  // 切去別的 App 再切回來，手機會把音訊停掉，回來要重新叫醒。
+  // iOS 從背景回來有時只發 pageshow、不發 visibilitychange，所以兩個都聽。
+  function wakeOnReturn() {
+    if (!ctx || isRunning()) return;
+    wakeCtx();
+    armUnlock(); // resume 若被擋下來，下次碰畫面還有機會
+  }
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && ctx && ctx.state === "suspended") ctx.resume();
+    if (!document.hidden) wakeOnReturn();
   });
+  window.addEventListener("pageshow", wakeOnReturn);
 
   function tone({ freq = 440, duration = 0.12, type = "sine", volume = 0.2, delay = 0, freqEnd = null }) {
     if (!enabled) return;
@@ -120,7 +205,7 @@ const SFX = (() => {
     osc.stop(t0 + duration + 0.03);
   }
 
-  return {
+  const api = {
     isEnabled: () => enabled,
     unlock() {
       unlockNow();
@@ -134,11 +219,17 @@ const SFX = (() => {
         /* ignore */
       }
       if (enabled) {
-        unlockNow();
-        this.click();
+        claimAudioSession();
+        // 這裡是使用者手勢，是最可靠的復原時機：叫不醒就重建，
+        // 確保「按下喇叭」一定伴隨一聲回饋音，而不是只有圖示變了。
+        revive().then((ok) => {
+          if (ok) api.click();
+        });
       }
       return enabled;
     },
+    // 目前的音訊狀態，給測試和除錯用
+    audioState: () => (ctx ? ctx.state : "none"),
     click() {
       tone({ freq: 720, duration: 0.06, type: "triangle", volume: 0.18 });
     },
@@ -266,6 +357,7 @@ const SFX = (() => {
       tone({ freq: 165, duration: 0.34, type: "sine", volume: 0.12, delay: 0.06 });
     },
   };
+  return api;
 })();
 
 // ---------- state ----------

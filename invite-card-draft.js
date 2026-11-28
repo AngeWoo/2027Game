@@ -396,17 +396,19 @@ function renderInviteCardDraft(opts = {}) {
   ctx.lineTo(W - 72, footerY - 36);
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(243, 199, 107, 0.85)";
-  ctx.font = `13px ${sans}`;
-  ctx.fillText(yearLabel, infoX, footerY - 14);
-  ctx.fillStyle = "#fdf8ee";
-  ctx.font = `bold 18px ${sans}`;
-  ctx.fillText(gameLabel, infoX, footerY + 10);
-
-  ctx.textAlign = "right";
+  // 「歡迎參觀」靠左（緊接著 QR，一眼看得出是在說那個 QR），
+  // 年份和遊戲名靠右收尾。基線取兩行文字的視覺中線，單獨一行才不會看起來偏高或偏低。
   ctx.fillStyle = goldLight;
   ctx.font = `bold 16px ${sans}`;
-  ctx.fillText(cta, W - 72, footerY + 10);
+  ctx.fillText(cta, infoX, footerY - 2);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(243, 199, 107, 0.85)";
+  ctx.font = `13px ${sans}`;
+  ctx.fillText(yearLabel, W - 72, footerY - 14);
+  ctx.fillStyle = "#fdf8ee";
+  ctx.font = `bold 18px ${sans}`;
+  ctx.fillText(gameLabel, W - 72, footerY + 10);
   ctx.textAlign = "left";
 
   // QR code
